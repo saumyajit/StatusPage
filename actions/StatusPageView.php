@@ -11,21 +11,18 @@ use API;
 class StatusPageView extends CController {
 
     protected function init(): void {
-        // Disable CSRF validation for this page
         $this->disableCsrfValidation();
     }
 
     protected function checkInput(): bool {
-        // Check if user has any preferences to save
         $fields = [
             'icon_size' => 'in tiny,small,medium,large',
             'spacing' => 'in normal,compact,ultra-compact',
-            'refresh' => 'in 0,1',
-            'page' => 'ge 1'
+            'refresh' => 'in 0,1'
         ];
 
         $ret = $this->validateInput($fields);
-
+        
         if (!$ret) {
             $this->setResponse(new CControllerResponseFatal());
         }
@@ -34,7 +31,6 @@ class StatusPageView extends CController {
     }
 
     protected function checkPermissions(): bool {
-        // Allow all logged-in users for now
         return $this->getUserType() >= USER_TYPE_ZABBIX_USER;
     }
 
@@ -45,19 +41,21 @@ class StatusPageView extends CController {
         $refresh = $this->hasInput('refresh') ? (bool)$this->getInput('refresh') : false;
 
         try {
-            // Fetch data from Zabbix API
+            // 1. Fetch host groups
             $host_groups = API::HostGroup()->get([
                 'output' => ['groupid', 'name'],
                 'preservekeys' => true
             ]);
 
+            // 2. Fetch hosts with their groups
             $hosts = API::Host()->get([
                 'output' => ['hostid', 'host', 'name', 'status'],
-                'selectHostGroups' => ['groupid'], // Correct parameter name
+                'selectHostGroups' => ['groupid'],
                 'monitored_hosts' => true,
                 'preservekeys' => true
             ]);
 
+            // 3. Fetch active triggers
             $triggers = API::Trigger()->get([
                 'output' => ['triggerid', 'description', 'priority', 'value'],
                 'selectHosts' => ['hostid'],
@@ -76,11 +74,11 @@ class StatusPageView extends CController {
                 'info_alerts' => 0
             ];
 
-            // Process host status
+            // Process each host
             $host_status = [];
+            
+            // First, map triggers to hosts
             $host_triggers = [];
-
-            // Group triggers by host first for better performance
             foreach ($triggers as $trigger) {
                 foreach ($trigger['hosts'] as $trigger_host) {
                     $hostid = $trigger_host['hostid'];
@@ -91,13 +89,13 @@ class StatusPageView extends CController {
                 }
             }
 
+            // Check each host's status
             foreach ($hosts as $hostid => $host) {
                 $is_healthy = true;
                 $has_critical = false;
                 $has_warning = false;
                 $has_info = false;
                 
-                // Check triggers for this host
                 if (isset($host_triggers[$hostid])) {
                     foreach ($host_triggers[$hostid] as $trigger) {
                         if ($trigger['value'] == TRIGGER_VALUE_TRUE) {
@@ -130,7 +128,7 @@ class StatusPageView extends CController {
                     'has_critical' => $has_critical,
                     'has_warning' => $has_warning,
                     'has_info' => $has_info,
-                    'hostgroups' => $host['hostgroups'] ?? [] // Use hostgroups instead of groups
+                    'groups' => $host['hostgroups'] ?? []
                 ];
 
                 if ($is_healthy) {
@@ -143,14 +141,13 @@ class StatusPageView extends CController {
             // Group hosts by host group
             $grouped_hosts = [];
             foreach ($hosts as $hostid => $host) {
-                // Check if hostgroups key exists
                 if (isset($host['hostgroups']) && is_array($host['hostgroups'])) {
                     foreach ($host['hostgroups'] as $group) {
                         $groupid = $group['groupid'];
                         if (!isset($grouped_hosts[$groupid])) {
                             $grouped_hosts[$groupid] = [
                                 'id' => $groupid,
-                                'name' => $host_groups[$groupid]['name'] ?? 'Unknown Group',
+                                'name' => $host_groups[$groupid]['name'] ?? 'Unknown',
                                 'hosts' => []
                             ];
                         }
@@ -164,14 +161,12 @@ class StatusPageView extends CController {
                 return strcmp($a['name'], $b['name']);
             });
 
-            // Calculate overall health percentage
-            if ($statistics['total_hosts'] > 0) {
-                $statistics['health_percentage'] = round(($statistics['healthy_hosts'] / $statistics['total_hosts']) * 100, 2);
-            } else {
-                $statistics['health_percentage'] = 0;
-            }
+            // Calculate health percentage
+            $statistics['health_percentage'] = $statistics['total_hosts'] > 0 
+                ? round(($statistics['healthy_hosts'] / $statistics['total_hosts']) * 100, 2)
+                : 0;
 
-            // Prepare response
+            // Prepare response data
             $data = [
                 'statistics' => $statistics,
                 'groups' => $grouped_hosts,
@@ -182,13 +177,12 @@ class StatusPageView extends CController {
                 'error' => null
             ];
 
-            // Add success message if refreshed
             if ($refresh) {
                 CMessageHelper::setSuccessTitle(_('Status page refreshed successfully'));
             }
 
         } catch (\Exception $e) {
-            // Handle API errors gracefully
+            // Error handling
             $data = [
                 'statistics' => [
                     'total_groups' => 0,
@@ -205,10 +199,11 @@ class StatusPageView extends CController {
                 'icon_size' => $icon_size,
                 'spacing' => $spacing,
                 'refresh' => $refresh,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'test_mode' => false
             ];
             
-            CMessageHelper::setErrorTitle(_('Failed to fetch data from Zabbix API'));
+            CMessageHelper::setErrorTitle(_('Failed to fetch data: ') . $e->getMessage());
         }
 
         $response = new CControllerResponseData($data);
