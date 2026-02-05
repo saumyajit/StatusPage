@@ -13,7 +13,7 @@ class Module extends CModule {
         
         // Add new Storage Analytics menu item
         $menu->insertAfter(_('Notification'),
-            (new CMenuItem(_('Status Page')))->setAction('status.page')->setIcon('iconlist')
+            (new CMenuItem(_('Status Page')))->setAction('status.page')
         );        
     }
 }
