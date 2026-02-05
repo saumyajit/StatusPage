@@ -7,25 +7,18 @@ use CControllerResponseData;
 
 class StatusPageView extends CAction {
 
-    protected function init(): void {
-        // Nothing needed here for basic setup
+    protected function checkInput(): bool {
+        return true;
     }
 
     protected function checkPermissions(): bool {
-        // Use getUserType() instead of checkAccess()
-        return $this->getUserType() >= USER_TYPE_ZABBIX_USER;
-    }
-
-    protected function checkPermissions(): bool {
-        // Allow any logged-in user
-        return $this->getUserType() >= USER_TYPE_ZABBIX_USER;
+        return true;
     }
 
     protected function doAction(): void {
-        // Simple test data
         $data = [
-            'message' => 'Status Page Module is working!',
-            'test' => 'Hello from StatusPage'
+            'message' => 'Status Page is working!',
+            'timestamp' => date('Y-m-d H:i:s')
         ];
 
         $response = new CControllerResponseData($data);
