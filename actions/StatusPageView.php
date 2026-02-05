@@ -1,13 +1,46 @@
-<?php
+<?php declare(strict_types = 1);
+
 namespace Modules\StatusPage\Actions;
 
 use CController;
 use CControllerResponseData;
+use CControllerResponseFatal;
+use CRoleHelper;
+use CWidget;
+use CForm;
+use CFormGrid;
+use CLabel;
+use CFormField;
+use CSelect;
+use CTextBox;
+use CCheckBox;
+use CSimpleButton;
+use CDiv;
+use CSpan;
+use CTag;
+use CView;
+use ZBX_STYLE_BTN_ALT;
+use ZBX_TEXTAREA_FILTER_STANDARD_WIDTH;
 
 /**
- * Main Status Page controller
+ * Status Page View Controller
  */
 class StatusPageView extends CController {
+    
+    /**
+     * Initialize action
+     */
+    public function init(): void {
+        $this->disableCsrfValidation();
+    }
+    
+    /**
+     * Check user permissions
+     */
+    protected function checkPermissions(): bool {
+        // Allow access for any authenticated Zabbix user
+        return $this->getUserType() >= USER_TYPE_ZABBIX_USER;
+    }
     
     /**
      * Validate input parameters
@@ -31,33 +64,15 @@ class StatusPageView extends CController {
     }
     
     /**
-     * Check user permissions
-     */
-	protected function checkPermissions(): bool {
-		// Allow any authenticated user
-		return true;
-	}
-    
-    /**
      * Main action logic
      */
     protected function doAction(): void {
         // Get filter parameters or defaults
-        $filter_groups = $this->hasInput('filter_groups') 
-            ? $this->getInput('filter_groups') 
-            : '';
-        $filter_alerts_only = $this->hasInput('filter_alerts_only') 
-            ? $this->getInput('filter_alerts_only') 
-            : 0;
-        $icon_size = $this->hasInput('icon_size') 
-            ? $this->getInput('icon_size') 
-            : 30;
-        $spacing = $this->hasInput('spacing') 
-            ? $this->getInput('spacing') 
-            : 'normal';
-        $limit = $this->hasInput('limit') 
-            ? $this->getInput('limit') 
-            : 500;
+        $filter_groups = $this->getInput('filter_groups', '');
+        $filter_alerts_only = (int) $this->getInput('filter_alerts_only', 0);
+        $icon_size = (int) $this->getInput('icon_size', 30);
+        $spacing = $this->getInput('spacing', 'normal');
+        $limit = (int) $this->getInput('limit', 500);
         
         // Prepare data for view
         $data = [
@@ -69,7 +84,6 @@ class StatusPageView extends CController {
                 'spacing' => $spacing,
                 'limit' => $limit
             ],
-            // Available options for filters
             'icon_sizes' => [
                 20 => _('Tiny (20px)'),
                 30 => _('Small (30px)'),
