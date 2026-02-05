@@ -1,0 +1,143 @@
+/* Status Page Styles */
+
+.status-summary {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 20px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.summary-item {
+    text-align: center;
+}
+
+.summary-count {
+    display: block;
+    font-size: 36px;
+    font-weight: bold;
+    color: #2196f3;
+}
+
+.summary-label {
+    display: block;
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+    margin-top: 5px;
+}
+
+#healthy-groups .summary-count {
+    color: #4caf50;
+}
+
+#alert-groups .summary-count {
+    color: #d32f2f;
+}
+
+.status-canvas-container {
+    position: relative;
+    width: 100%;
+    min-height: 600px;
+    background: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: auto;
+}
+
+#status-canvas {
+    display: block;
+}
+
+.status-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.9);
+    color: #fff;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    max-width: 350px;
+    z-index: 10000;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.tooltip-header {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    padding-bottom: 6px;
+}
+
+.tooltip-body {
+    margin-top: 8px;
+}
+
+.severity-counts {
+    margin-bottom: 10px;
+}
+
+.severity-item {
+    padding: 3px 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+.severity-name {
+    font-weight: 500;
+}
+
+.severity-count {
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.severity-5 { color: #ff4444; }
+.severity-4 { color: #ff9800; }
+.severity-3 { color: #ffb74d; }
+.severity-2 { color: #ffc107; }
+.severity-1 { color: #42a5f5; }
+
+.tooltip-problems {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.status-ok {
+    color: #4caf50;
+    font-weight: 500;
+    padding: 8px 0;
+}
+
+.status-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 255, 255, 0.95);
+    padding: 20px 40px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    font-size: 16px;
+    z-index: 1000;
+}
+
+/* Filter form styles */
+#status-page-filter {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+#status-page-filter .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
