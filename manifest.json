@@ -10,10 +10,6 @@
         "status.page": {
             "class": "StatusPageView",
             "view": "statuspage.view"            
-        },
-        "top.group": {
-            "class": "StatusPageData",
-            "view": "statuspage.data"
         }
     ]
 }
