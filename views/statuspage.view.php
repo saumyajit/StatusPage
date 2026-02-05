@@ -1,38 +1,113 @@
 <?php
-// $groups is provided by controller
+$widget = (new CWidget())
+    ->setTitle(_('Status Page Widget'))
+    ->setControls(
+        (new CTag('nav', true,
+            (new CList())
+                ->addItem(
+                    (new CButton('refresh', _('Refresh')))
+                        ->onClick('location.reload();')
+                )
+        ))->setAttribute('aria-label', _('Content controls'))
+    )
+    ->addItem(makeFilterForm($data));
+
+// Summary statistics
+$stats_div = (new CDiv())
+    ->addClass('status-summary')
+    ->addItem([
+        (new CDiv([
+            (new CDiv($data['total_groups']))->addClass('stat-number'),
+            (new CDiv(_('HOST GROUPS')))->addClass('stat-label')
+        ]))->addClass('stat-item'),
+        (new CDiv([
+            (new CDiv($data['total_healthy']))->addClass('stat-number healthy-color'),
+            (new CDiv(_('HEALTHY')))->addClass('stat-label')
+        ]))->addClass('stat-item'),
+        (new CDiv([
+            (new CDiv($data['total_with_alerts']))->addClass('stat-number alert-color'),
+            (new CDiv(_('WITH ALERTS')))->addClass('stat-label')
+        ]))->addClass('stat-item')
+    ]);
+
+$widget->addItem($stats_div);
+
+// Status icons container
+$icons_container = (new CDiv())
+    ->addClass('status-icons-container')
+    ->addClass('spacing-' . $data['spacing'])
+    ->addClass('size-' . $data['icon_size']);
+
+foreach ($data['groups'] as $group) {
+    $icon = (new CDiv())
+        ->addClass('status-icon')
+        ->addClass($group['has_problems'] ? 'status-problem' : 'status-ok')
+        ->setAttribute('data-groupid', $group['groupid'])
+        ->setAttribute('data-groupname', $group['full_name'])
+        ->setAttribute('data-problems', json_encode($group['problems']))
+        ->setAttribute('data-severity', json_encode($group['severity_counts']));
+    
+    if ($group['problem_count'] > 0) {
+        $icon->addItem(
+            (new CDiv($group['problem_count']))->addClass('problem-count')
+        );
+    }
+    
+    $icons_container->addItem($icon);
+}
+
+$widget->addItem($icons_container);
+
+// Tooltip container
+$widget->addItem(
+    (new CDiv())->setId('status-tooltip')->addClass('status-tooltip')
+);
+
+$widget->show();
+
+function makeFilterForm($data) {
+    $form = (new CFilter())
+        ->setResetUrl(new CUrl('zabbix.php')->setArgument('action', 'status.page'))
+        ->setProfile('web.statuspage.filter')
+        ->setAttribute('aria-label', _('Filter'));
+
+    $form->addFilterTab(_('Filter'), [
+        (new CFormList())
+            ->addRow(_('Host group name'),
+                (new CTextBox('filter_name', $data['filter_name']))
+                    ->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
+                    ->setAttribute('placeholder', _('type to filter'))
+            )
+            ->addRow(_('Show only groups with problems'),
+                (new CCheckBox('filter_with_problems'))
+                    ->setChecked($data['filter_with_problems'] == 1)
+            )
+            ->addRow(_('Icon size'),
+                (new CSelect('icon_size'))
+                    ->setValue($data['icon_size'])
+                    ->addOptions(CSelect::createOptionsFromArray([
+                        20 => _('Tiny (20px)'),
+                        30 => _('Small (30px)'),
+                        40 => _('Medium (40px)'),
+                        50 => _('Large (50px)')
+                    ]))
+            )
+            ->addRow(_('Spacing'),
+                (new CSelect('spacing'))
+                    ->setValue($data['spacing'])
+                    ->addOptions(CSelect::createOptionsFromArray([
+                        'normal' => _('Normal'),
+                        'compact' => _('Ultra Compact')
+                    ]))
+            )
+    ]);
+
+    return $form;
+}
 ?>
 
-<div class="status-page">
-
-  <div class="status-toolbar">
-    <label>
-      <input type="checkbox" id="filterAlerts" />
-      Show only groups with alerts
-    </label>
-
-    <label>
-      Size:
-      <select id="dotSize">
-        <option value="tiny">20px</option>
-        <option value="small" selected>30px</option>
-        <option value="medium">40px</option>
-        <option value="large">50px</option>
-      </select>
-    </label>
-  </div>
-
-  <div class="status-grid" id="statusGrid">
-    <?php foreach ($groups as $g): ?>
-      <div class="status-dot <?= $g['status'] ?>"
-           data-total="<?= $g['total'] ?>"
-           data-has-alert="<?= $g['total'] > 0 ? 1 : 0 ?>"
-           data-tooltip='<?= json_encode($g) ?>'>
-        <?= $g['total'] > 0 ? $g['total'] : '' ?>
-      </div>
-    <?php endforeach; ?>
-  </div>
-
-</div>
-
-<script src="assets/js/statuspage.js"></script>
-<link rel="stylesheet" href="assets/css/statuspage.css">
+<script type="text/javascript">
+    jQuery(document).ready(function($) {
+        StatusPage.init();
+    });
+</script>
