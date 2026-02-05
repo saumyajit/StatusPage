@@ -11,8 +11,9 @@ class StatusPageView extends CAction {
         return true;
     }
 
-    protected function checkPermissions(): bool {
-        return true;
+   protected function checkPermissions(): bool {
+        // Allow any logged-in user
+        return $this->getUserType() >= USER_TYPE_ZABBIX_USER;
     }
 
     protected function doAction(): void {
