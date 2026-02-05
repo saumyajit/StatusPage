@@ -7,6 +7,13 @@ use CControllerResponseData;
 
 class StatusPageView extends CController {
 
+    /**
+     * Required by CController
+     */
+    protected function checkInput(): bool {
+        return true;
+    }
+
     protected function checkPermissions(): bool {
         return $this->getUserType() >= USER_TYPE_ZABBIX_USER;
     }
