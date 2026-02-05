@@ -9,8 +9,7 @@
     "actions": [
         "status.page": {
             "class": "StatusPageView",
-            "view": "statuspage.view",
-            
+            "view": "statuspage.view"            
         },
         "top.group": {
             "class": "StatusPageData",
