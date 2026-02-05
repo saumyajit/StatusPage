@@ -4,13 +4,15 @@ namespace Modules\StatusPage\Actions;
 
 use CController;
 use CControllerResponseData;
+use CControllerResponseFatal;
 use API;
 use CArrayHelper;
 
 class StatusPageView extends CController {
 
     protected function init(): void {
-        $this->disableSIDValidation();
+        // Remove disableSIDValidation() - it doesn't exist
+        // If you need to disable CSRF, handle it differently
     }
 
     protected function checkInput(): bool {
@@ -31,7 +33,8 @@ class StatusPageView extends CController {
     }
 
     protected function checkPermissions(): bool {
-        return $this->checkAccess(CRoleHelper::UI_MONITORING_HOSTS);
+        // Use getUserType() instead of checkAccess()
+        return $this->getUserType() >= USER_TYPE_ZABBIX_USER;
     }
 
     protected function doAction(): void {
@@ -88,7 +91,6 @@ class StatusPageView extends CController {
                     'source' => EVENT_SOURCE_TRIGGERS,
                     'object' => EVENT_OBJECT_TRIGGER,
                     'suppressed' => false,
-                    'selectTriggers' => ['triggerid', 'description', 'priority'],
                     'selectHosts' => ['hostid', 'name'],
                     'recent' => false
                 ]);
@@ -97,6 +99,7 @@ class StatusPageView extends CController {
                 foreach ($all_problems as $problem) {
                     if (!empty($problem['hosts'])) {
                         $hostid = $problem['hosts'][0]['hostid'];
+                        $severity = isset($problem['severity']) ? $problem['severity'] : TRIGGER_SEVERITY_NOT_CLASSIFIED;
                         
                         foreach ($group_hosts as $groupid => $host_list) {
                             if (in_array($hostid, $host_list)) {
@@ -115,7 +118,6 @@ class StatusPageView extends CController {
                                     ];
                                 }
                                 
-                                $severity = $problem['severity'];
                                 $problems_data[$groupid]['total']++;
                                 $problems_data[$groupid]['severity'][$severity]++;
                                 $problems_data[$groupid]['problems'][] = [
