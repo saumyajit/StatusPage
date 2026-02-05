@@ -1,4 +1,6 @@
 <?php
+$this->addJsFile('modules/StatusPage/assets/js/statuspage.js');
+
 $widget = (new CWidget())
     ->setTitle(_('Status Page Widget'))
     ->setControls(
@@ -9,8 +11,50 @@ $widget = (new CWidget())
                         ->onClick('location.reload();')
                 )
         ))->setAttribute('aria-label', _('Content controls'))
+    );
+
+// Filter form
+$filter_form = (new CForm('get'))
+    ->setName('statuspage_filter')
+    ->addVar('action', 'status.page');
+
+$filter_form_list = (new CFormList())
+    ->addRow(_('Host group name'),
+        (new CTextBox('filter_name', $data['filter_name']))
+            ->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
+            ->setAttribute('placeholder', _('type to filter'))
+            ->setAttribute('autofocus', 'autofocus')
     )
-    ->addItem(makeFilterForm($data));
+    ->addRow(_('Show only groups with problems'),
+        (new CCheckBox('filter_with_problems', 1))
+            ->setChecked($data['filter_with_problems'] == 1)
+    )
+    ->addRow(_('Icon size'),
+        (new CSelect('icon_size'))
+            ->setValue($data['icon_size'])
+            ->addOptions(CSelect::createOptionsFromArray([
+                20 => _('Tiny (20px)'),
+                30 => _('Small (30px)'),
+                40 => _('Medium (40px)'),
+                50 => _('Large (50px)')
+            ]))
+    )
+    ->addRow(_('Spacing'),
+        (new CSelect('spacing'))
+            ->setValue($data['spacing'])
+            ->addOptions(CSelect::createOptionsFromArray([
+                'normal' => _('Normal'),
+                'compact' => _('Ultra Compact')
+            ]))
+    );
+
+$filter_form->addItem($filter_form_list);
+
+$filter_form->addItem(
+    (new CSubmitButton(_('Apply'), 'filter_apply'))->addClass('js-filter-submit')
+);
+
+$widget->addItem($filter_form);
 
 // Summary statistics
 $stats_div = (new CDiv())
@@ -64,46 +108,6 @@ $widget->addItem(
 );
 
 $widget->show();
-
-function makeFilterForm($data) {
-    $form = (new CFilter())
-        ->setResetUrl(new CUrl('zabbix.php')->setArgument('action', 'status.page'))
-        ->setProfile('web.statuspage.filter')
-        ->setAttribute('aria-label', _('Filter'));
-
-    $form->addFilterTab(_('Filter'), [
-        (new CFormList())
-            ->addRow(_('Host group name'),
-                (new CTextBox('filter_name', $data['filter_name']))
-                    ->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
-                    ->setAttribute('placeholder', _('type to filter'))
-            )
-            ->addRow(_('Show only groups with problems'),
-                (new CCheckBox('filter_with_problems'))
-                    ->setChecked($data['filter_with_problems'] == 1)
-            )
-            ->addRow(_('Icon size'),
-                (new CSelect('icon_size'))
-                    ->setValue($data['icon_size'])
-                    ->addOptions(CSelect::createOptionsFromArray([
-                        20 => _('Tiny (20px)'),
-                        30 => _('Small (30px)'),
-                        40 => _('Medium (40px)'),
-                        50 => _('Large (50px)')
-                    ]))
-            )
-            ->addRow(_('Spacing'),
-                (new CSelect('spacing'))
-                    ->setValue($data['spacing'])
-                    ->addOptions(CSelect::createOptionsFromArray([
-                        'normal' => _('Normal'),
-                        'compact' => _('Ultra Compact')
-                    ]))
-            )
-    ]);
-
-    return $form;
-}
 ?>
 
 <script type="text/javascript">
