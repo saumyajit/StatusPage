@@ -4,6 +4,7 @@ namespace Modules\StatusPageCompact\Actions;
 
 use CControllerResponseData;
 use CController;
+use CRoleHelper;
 
 class StatusPageView extends CController {
 
