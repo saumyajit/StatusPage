@@ -9,7 +9,12 @@
     "actions": {
         "status.page": {
             "class": "StatusPageView",
-            "view": "statuspage.view"            
+            "view": "statuspage.view",
+            "layout": "layout.htmlpage"
+        },
+        "status.page.data": {
+            "class": "StatusPageData",
+            "layout": "layout.json"
         }
     }
 }
