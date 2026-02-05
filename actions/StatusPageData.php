@@ -27,9 +27,10 @@ class StatusPageData extends CController {
         return $ret;
     }
     
-    protected function checkPermissions(): bool {
-        return $this->getUserType() >= USER_TYPE_ZABBIX_USER;
-    }
+	protected function checkPermissions(): bool {
+		// Allow any authenticated user
+		return true;
+	}
     
     protected function doAction(): void {
         $filter_groups = $this->getInput('filter_groups', '');
