@@ -22,11 +22,20 @@ $spacing_classes = [
 $current_icon_size = $icon_sizes[$icon_size] ?? $icon_sizes['small'];
 $current_spacing_class = $spacing_classes[$spacing] ?? $spacing_classes['normal'];
 
+// Use absolute path for includes
 $web_layout_mode = ZBX_LAYOUT_NORMAL;
-require_once dirname(__FILE__).'/../../include/page_header.php';
+
+// Include page header with correct path
+(new CView('layout.html', [
+    'page' => [
+        'title' => $page_title,
+        'file' => 'modules/StatusPage/views/statuspage.view.php'
+    ],
+    'data' => $data
+]))->show();
 ?>
 
-<!-- Status Page Container -->
+<!-- Status Page Content -->
 <div class="status-page-container" data-module="StatusPage">
     <!-- Header Section -->
     <div class="status-page-header">
@@ -67,7 +76,7 @@ require_once dirname(__FILE__).'/../../include/page_header.php';
                 <i class="icon-server"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-number"><?= $data['statistics']['total_groups'] ?></div>
+                <div class="stat-number"><?= $data['statistics']['total_groups'] ?? 0 ?></div>
                 <div class="stat-label"><?= _('Host Groups') ?></div>
             </div>
         </div>
@@ -77,7 +86,7 @@ require_once dirname(__FILE__).'/../../include/page_header.php';
                 <i class="icon-check"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-number"><?= $data['statistics']['healthy_hosts'] ?></div>
+                <div class="stat-number"><?= $data['statistics']['healthy_hosts'] ?? 0 ?></div>
                 <div class="stat-label"><?= _('Healthy Hosts') ?></div>
             </div>
         </div>
@@ -87,7 +96,7 @@ require_once dirname(__FILE__).'/../../include/page_header.php';
                 <i class="icon-warning"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-number"><?= $data['statistics']['hosts_with_alerts'] ?></div>
+                <div class="stat-number"><?= $data['statistics']['hosts_with_alerts'] ?? 0 ?></div>
                 <div class="stat-label"><?= _('Hosts with Alerts') ?></div>
             </div>
         </div>
@@ -97,7 +106,7 @@ require_once dirname(__FILE__).'/../../include/page_header.php';
                 <i class="icon-alert"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-number"><?= $data['statistics']['critical_alerts'] ?></div>
+                <div class="stat-number"><?= $data['statistics']['critical_alerts'] ?? 0 ?></div>
                 <div class="stat-label"><?= _('Critical Alerts') ?></div>
             </div>
         </div>
@@ -122,10 +131,18 @@ require_once dirname(__FILE__).'/../../include/page_header.php';
         </div>
     </div>
 
+    <?php if (!empty($data['error'])): ?>
+    <!-- Error Message -->
+    <div class="alert alert-danger">
+        <strong><?= _('Error:') ?></strong> <?= htmlspecialchars($data['error']) ?>
+    </div>
+    <?php endif; ?>
+
     <!-- Host Groups Grid -->
+    <?php if (!empty($data['groups'])): ?>
     <div class="host-groups-container <?= $current_spacing_class ?>">
-        <?php foreach ($data['groups'] as $group_id => $group): ?>
-        <div class="host-group" data-group-id="<?= $group_id ?>">
+        <?php foreach ($data['groups'] as $group): ?>
+        <div class="host-group" data-group-id="<?= $group['id'] ?>">
             <div class="group-header">
                 <h3 class="group-name"><?= htmlspecialchars($group['name']) ?></h3>
                 <span class="group-count">(<?= count($group['hosts']) ?> <?= _('hosts') ?>)</span>
@@ -138,7 +155,7 @@ require_once dirname(__FILE__).'/../../include/page_header.php';
                     <?= $host_status['has_critical'] ? 'status-critical' : '' ?>
                     <?= $host_status['has_warning'] ? 'status-warning' : '' ?>"
                     data-host-id="<?= $host_id ?>"
-                    title="<?= $host_status['healthy'] ? _('Healthy') : ($host_status['has_critical'] ? _('Critical Alert') : _('Warning Alert')) ?>">
+                    title="<?= htmlspecialchars($host_status['host']) ?>: <?= $host_status['healthy'] ? _('Healthy') : ($host_status['has_critical'] ? _('Critical Alert') : _('Warning Alert')) ?>">
                     <div class="icon-inner">
                         <i class="icon-server"></i>
                     </div>
@@ -148,6 +165,13 @@ require_once dirname(__FILE__).'/../../include/page_header.php';
         </div>
         <?php endforeach; ?>
     </div>
+    <?php else: ?>
+    <!-- No Data Message -->
+    <div class="no-data-message">
+        <i class="icon-info"></i>
+        <p><?= _('No host groups found or you don\'t have permission to view them.') ?></p>
+    </div>
+    <?php endif; ?>
     
     <!-- Loading Overlay -->
     <div class="loading-overlay" style="display: none;">
@@ -160,14 +184,11 @@ require_once dirname(__FILE__).'/../../include/page_header.php';
     // Pass data to JavaScript
     const StatusPageData = {
         module_name: 'StatusPage',
-        statistics: <?= json_encode($data['statistics']) ?>,
-        groups_count: <?= $data['total_groups_count'] ?>,
+        statistics: <?= json_encode($data['statistics'] ?? []) ?>,
+        groups_count: <?= $data['total_groups_count'] ?? 0 ?>,
         current_settings: {
             icon_size: '<?= $icon_size ?>',
             spacing: '<?= $spacing ?>'
         }
     };
 </script>
-
-<?php
-require_once dirname(__FILE__).'/../../include/page_footer.php';
