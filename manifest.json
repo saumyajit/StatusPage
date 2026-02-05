@@ -6,10 +6,14 @@
     "namespace": "StatusPageCompact",
     "description": "Compact visual status page for large-scale deployments",
     "author": "Saumyajit Pramanik",
-    "actions": [
+    "actions": {
         "status.page": {
             "class": "StatusPageView",
             "view": "statuspage.view"            
+        },
+        "top.group": {
+            "class": "StatusPageData",
+            "view": "statuspage.data"
         }
-    ]
+    }
 }
