@@ -28,7 +28,7 @@ class StatusPageData extends CController {
     }
     
     protected function checkPermissions(): bool {
-        return $this->checkAccess(CRoleHelper::UI_REPORTS);
+        return $this->getUserType() >= USER_TYPE_ZABBIX_USER;
     }
     
     protected function doAction(): void {
