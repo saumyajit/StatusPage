@@ -33,9 +33,10 @@ class StatusPageView extends CController {
     /**
      * Check user permissions
      */
-    protected function checkPermissions(): bool {
-        return $this->getUserType() >= USER_TYPE_ZABBIX_USER;
-    }
+	protected function checkPermissions(): bool {
+		// Allow any authenticated user
+		return true;
+	}
     
     /**
      * Main action logic
