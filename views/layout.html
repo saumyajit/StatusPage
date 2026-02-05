@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{$page_title}</title>
+    
+    <link rel="shortcut icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="192x192" href="touch-icon-192x192.png">
+    
+    <script src="js/browsers.js"></script>
+    
+    <link rel="stylesheet" type="text/css" href="assets/css/statuspage.css">
+    
+    <!-- Zabbix CSS -->
+    {foreach $stylesheets as $stylesheet}
+        <link rel="stylesheet" type="text/css" href="{$stylesheet.url}">
+    {/foreach}
+    
+    <!-- Zabbix JS -->
+    <script src="jsLoader.php?lang={$lang}&amp;ver={$ZABBIX_VERSION}"></script>
+</head>
+<body class="{$web_layout_mode}">
+    <div class="container">
+        <header>
+            <nav>
+                {include file="mainmenu.html"}
+            </nav>
+        </header>
+        
+        <main>
+            {include file="{$page['file']}"}
+        </main>
+        
+        <footer>
+            {include file="footer.html"}
+        </footer>
+    </div>
+    
+    <script src="assets/js/statuspage.js"></script>
+</body>
+</html>
