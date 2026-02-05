@@ -1,1 +1,24 @@
-hi
+{
+    "manifest_version": 2.0,
+    "id": "status-page-compact",
+    "name": "Status Page",
+    "version": "2.0.0",
+    "namespace": "StatusPageCompact",
+    "description": "Compact status page for large-scale deployments - shows host group status without labels",
+    "author": "Custom Development",
+    "url": "",
+    "actions": [
+        {
+            "name": "statuspage.compact.view",
+            "file": "actions/StatusPageView.php"
+        }
+    ],
+    "widgets": [
+        {
+            "id": "statuspage-compact",
+            "name": "Status Page",
+            "description": "Compact visual status display for 1000+ host groups",
+            "js_class": "WidgetStatusPageCompact"
+        }
+    ]
+}
