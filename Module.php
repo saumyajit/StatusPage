@@ -1,23 +1,19 @@
-<?php declare(strict_types = 1);
-
+<?php
 namespace Modules\StatusPageCompact;
 
-use APP;
-use CMenu;
-use CMenuItem;
 use Zabbix\Core\CModule;
+use APP;
+use CMenuItem;
 
 class Module extends CModule {
-
     public function init(): void {
-        // Initialize module
-    }
-
-    public function getMenuItems(): array {
-        return [
-            (new CMenuItem(_('Status Page')))
-                ->setAction('statuspage.view')
-                ->setIcon('iconlist')
-        ];
+        $menu = APP::Component()->get('menu.main')
+            ->findOrAdd(_('Reports'))
+                ->getSubmenu();
+        
+        // Add new Storage Analytics menu item
+        $menu->insertAfter(_('Notification'),
+            (new CMenuItem(_('Status Page')))->setAction('statuspage.view')->setIcon('iconlist')
+        );        
     }
 }
