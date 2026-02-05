@@ -1,5 +1,5 @@
 <?php
-namespace Modules\StatusPageCompact;
+namespace Modules\StatusPage;
 
 use Zabbix\Core\CModule;
 use APP;
