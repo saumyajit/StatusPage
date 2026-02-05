@@ -3,7 +3,7 @@
     "id": "statuspage",
     "name": "Status Page",
     "version": "1.0.1",
-    "namespace": "StatusPageCompact",
+    "namespace": "StatusPage",
     "description": "Compact visual status page for large-scale deployments",
     "author": "Saumyajit Pramanik",
     "actions": {
