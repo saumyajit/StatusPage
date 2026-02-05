@@ -1,35 +1,243 @@
-.status-page {
-    padding: 15px;
-}
-
-.status-toolbar {
-    margin-bottom: 10px;
+/* Status Summary */
+.status-summary {
     display: flex;
-    gap: 20px;
-    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    padding: 20px;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    color: white;
 }
 
-.status-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(30px, 1fr));
-    gap: 6px;
+.stat-item {
+    text-align: center;
 }
 
-.status-dot {
+.stat-number {
+    font-size: 36px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.9;
+}
+
+.healthy-color {
+    color: #4ade80;
+}
+
+.alert-color {
+    color: #f87171;
+}
+
+/* Status Icons Container */
+.status-icons-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    min-height: 200px;
+}
+
+.status-icons-container.spacing-compact {
+    gap: 4px;
+}
+
+/* Status Icon */
+.status-icon {
     border-radius: 50%;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: bold;
-    color: #fff;
-    font-size: 10px;
+    flex-shrink: 0;
 }
 
-.status-dot.green { background: #4caf50; }
-.status-dot.yellow { background: #ffb300; }
-.status-dot.red { background: #f44336; }
+.status-icons-container.size-20 .status-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 9px;
+}
 
-.status-dot.tiny { width: 20px; height: 20px; }
-.status-dot.small { width: 30px; height: 30px; }
-.status-dot.medium { width: 40px; height: 40px; }
-.status-dot.large { width: 50px; height: 50px; }
+.status-icons-container.size-30 .status-icon {
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
+}
+
+.status-icons-container.size-40 .status-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 13px;
+}
+
+.status-icons-container.size-50 .status-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 15px;
+}
+
+.status-icon.status-ok {
+    background-color: #4ade80;
+    box-shadow: 0 2px 4px rgba(74, 222, 128, 0.3);
+}
+
+.status-icon.status-problem {
+    background-color: #ef4444;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+}
+
+.status-icon.status-warning {
+    background-color: #fb923c;
+    box-shadow: 0 2px 4px rgba(251, 146, 60, 0.3);
+}
+
+.status-icon:hover {
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+}
+
+.problem-count {
+    color: white;
+    font-weight: bold;
+    font-size: inherit;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Tooltip */
+.status-tooltip {
+    position: absolute;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    display: none;
+    max-width: 400px;
+    min-width: 280px;
+    font-size: 13px;
+}
+
+.tooltip-header {
+    font-weight: bold;
+    font-size: 15px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e5e7eb;
+    color: #1f2937;
+}
+
+.tooltip-status {
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.tooltip-healthy {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.tooltip-problem {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.tooltip-severity {
+    margin-bottom: 10px;
+}
+
+.severity-row {
+    padding: 4px 8px;
+    margin: 2px 0;
+    border-radius: 3px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.severity-label {
+    font-weight: 500;
+}
+
+.severity-count {
+    font-weight: bold;
+}
+
+.severity-disaster {
+    background: #fecaca;
+    color: #7f1d1d;
+}
+
+.severity-high {
+    background: #fed7aa;
+    color: #7c2d12;
+}
+
+.severity-avg {
+    background: #fed7aa;
+    color: #92400e;
+}
+
+.severity-warn {
+    background: #fef3c7;
+    color: #78350f;
+}
+
+.severity-info {
+    background: #dbeafe;
+    color: #1e3a8a;
+}
+
+.severity-na {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+.tooltip-problems-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 8px;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 8px;
+}
+
+.problem-item {
+    padding: 6px 8px;
+    margin: 4px 0;
+    background: #f9fafb;
+    border-radius: 4px;
+    border-left: 3px solid #ef4444;
+}
+
+.problem-host {
+    font-weight: 600;
+    color: #374151;
+    font-size: 12px;
+    margin-bottom: 2px;
+}
+
+.problem-name {
+    color: #6b7280;
+    font-size: 12px;
+    word-wrap: break-word;
+}
+
+.problem-more {
+    text-align: center;
+    padding: 6px;
+    color: #6b7280;
+    font-style: italic;
+    font-size: 12px;
+}
