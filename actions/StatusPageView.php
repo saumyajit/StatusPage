@@ -4,90 +4,72 @@ namespace Modules\StatusPage\Actions;
 
 use CController;
 use CControllerResponseData;
-use CControllerResponseFatal;
 
-/**
- * Status Page View Controller
- */
 class StatusPageView extends CController {
-    
-    /**
-     * Initialize action
-     */
-    public function init(): void {
-        $this->disableCsrfValidation();
-    }
-    
-    /**
-     * Check user permissions
-     */
+
     protected function checkPermissions(): bool {
-        // Allow access for any authenticated Zabbix user
         return $this->getUserType() >= USER_TYPE_ZABBIX_USER;
     }
-    
-    /**
-     * Validate input parameters
-     */
-    protected function checkInput(): bool {
-        $fields = [
-            'filter_groups' => 'string',
-            'filter_alerts_only' => 'in 0,1',
-            'icon_size' => 'in 20,30,40,50',
-            'spacing' => 'in normal,compact',
-            'limit' => 'in 100,500,1000,2000'
-        ];
-        
-        $ret = $this->validateInput($fields);
-        
-        if (!$ret) {
-            $this->setResponse(new CControllerResponseFatal());
-        }
-        
-        return $ret;
-    }
-    
-    /**
-     * Main action logic
-     */
+
     protected function doAction(): void {
-        // Get filter parameters or defaults
-        $filter_groups = $this->getInput('filter_groups', '');
-        $filter_alerts_only = (int) $this->getInput('filter_alerts_only', 0);
-        $icon_size = (int) $this->getInput('icon_size', 30);
-        $spacing = $this->getInput('spacing', 'normal');
-        $limit = (int) $this->getInput('limit', 500);
-        
-        // Prepare data for view
-        $data = [
-            'title' => _('Status Page'),
-            'filter' => [
-                'groups' => $filter_groups,
-                'alerts_only' => $filter_alerts_only,
-                'icon_size' => $icon_size,
-                'spacing' => $spacing,
-                'limit' => $limit
-            ],
-            'icon_sizes' => [
-                20 => _('Tiny (20px)'),
-                30 => _('Small (30px)'),
-                40 => _('Medium (40px)'),
-                50 => _('Large (50px)')
-            ],
-            'spacing_options' => [
-                'normal' => _('Normal'),
-                'compact' => _('Ultra Compact')
-            ],
-            'limit_options' => [
-                100 => _('100 groups'),
-                500 => _('500 groups'),
-                1000 => _('1000 groups'),
-                2000 => _('2000 groups')
-            ]
-        ];
-        
-        $response = new CControllerResponseData($data);
-        $response->setTitle(_('Status Page'));
-        $this->setResponse($response);
+
+        // 1) Get HostGroups
+        $groups = API::HostGroup()->get([
+            'output' => ['groupid', 'name'],
+            'search' => ['name' => 'CUSTOMER/'],
+            'startSearch' => true
+        ]);
+
+        $groupIds = array_column($groups, 'groupid');
+
+        // 2) Get active problems (alerts)
+        $problems = API::Problem()->get([
+            'output' => ['eventid', 'severity'],
+            'groupids' => $groupIds,
+            'recent' => true,
+            'sortfield' => ['eventid'],
+            'sortorder' => 'DESC'
+        ]);
+
+        // 3) Aggregate alerts by group
+        $alerts = [];
+        foreach ($problems as $p) {
+            foreach ($p['groups'] as $g) {
+                $gid = $g['groupid'];
+                if (!isset($alerts[$gid])) {
+                    $alerts[$gid] = [
+                        'total' => 0,
+                        'severity' => array_fill(0, 6, 0)
+                    ];
+                }
+                $alerts[$gid]['total']++;
+                $alerts[$gid]['severity'][$p['severity']]++;
+            }
+        }
+
+        // 4) Build view data
+        $data = [];
+        foreach ($groups as $g) {
+            $gid = $g['groupid'];
+            $total = $alerts[$gid]['total'] ?? 0;
+            $severity = $alerts[$gid]['severity'] ?? array_fill(0, 6, 0);
+
+            $status = 'green';
+            if ($total > 0) {
+                $status = ($severity[4] > 0 || $severity[5] > 0) ? 'red' : 'yellow';
+            }
+
+            $data[] = [
+                'groupid' => $gid,
+                'name' => substr($g['name'], strlen('CUSTOMER/')),
+                'total' => $total,
+                'severity' => $severity,
+                'status' => $status
+            ];
+        }
+
+        $this->setResponse(new CControllerResponseData([
+            'groups' => $data
+        ]));
     }
 }
