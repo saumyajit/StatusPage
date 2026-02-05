@@ -7,13 +7,14 @@
     "description": "Compact visual status page for large-scale deployments",
     "author": "Saumyajit Pramanik",
     "actions": [
-        {
-            "route": "statuspage.view",
-            "class": "StatusPageView"
+        "status.page": {
+            "class": "StatusPageView",
+            "view": "statuspage.view",
+            
         },
-        {
-            "route": "statuspage.data",
-            "class": "StatusPageData"
+        "top.group": {
+            "class": "StatusPageData",
+            "view": "statuspage.data"
         }
     ]
 }
