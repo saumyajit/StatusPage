@@ -2,7 +2,7 @@
 
 namespace Modules\StatusPage;
 
-use Core\CModule;
+use Zabbix\Core\CModule;
 use APP;
 use CMenuItem;
 
