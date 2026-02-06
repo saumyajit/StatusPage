@@ -25,7 +25,11 @@ class StatusPageView extends CController {
             'filter_severities' => 'array',
             'filter_tags' => 'array',
             'filter_alert_name' => 'string',
-            'filter_logic' => 'in AND,OR'
+            'filter_logic' => 'in AND,OR',
+            // Time range fields
+            'filter_time_range' => 'in 1h,3h,6h,12h,24h,3d,7d,15d,30d,custom',
+            'filter_time_from' => 'string',
+            'filter_time_to' => 'string'
         ];
 
         $ret = $this->validateInput($fields);
@@ -54,8 +58,48 @@ class StatusPageView extends CController {
         $filter_tags = $this->getInput('filter_tags', []);
         $filter_alert_name = $this->getInput('filter_alert_name', '');
         $filter_logic = $this->getInput('filter_logic', 'OR');
+        
+        // Time range filters
+        $filter_time_range = $this->getInput('filter_time_range', '');
+        $filter_time_from = $this->getInput('filter_time_from', '');
+        $filter_time_to = $this->getInput('filter_time_to', '');
 
         try {
+            // Calculate time range timestamps
+            $time_from = null;
+            $time_to = null;
+            
+            if (!empty($filter_time_range)) {
+                $time_to = time();
+                
+                if ($filter_time_range === 'custom') {
+                    // Parse custom time range
+                    if (!empty($filter_time_from)) {
+                        $time_from = strtotime($filter_time_from);
+                    }
+                    if (!empty($filter_time_to)) {
+                        $time_to = strtotime($filter_time_to);
+                    }
+                } else {
+                    // Preset time ranges
+                    $time_ranges = [
+                        '1h' => 3600,           // 1 hour
+                        '3h' => 10800,          // 3 hours
+                        '6h' => 21600,          // 6 hours
+                        '12h' => 43200,         // 12 hours
+                        '24h' => 86400,         // 24 hours
+                        '3d' => 259200,         // 3 days
+                        '7d' => 604800,         // 7 days
+                        '15d' => 1296000,       // 15 days
+                        '30d' => 2592000        // 30 days
+                    ];
+                    
+                    if (isset($time_ranges[$filter_time_range])) {
+                        $time_from = $time_to - $time_ranges[$filter_time_range];
+                    }
+                }
+            }
+
             // 1. Fetch host groups starting with "CUSTOMER/"
             $all_host_groups = API::HostGroup()->get([
                 'output' => ['groupid', 'name'],
@@ -79,15 +123,25 @@ class StatusPageView extends CController {
                 'preservekeys' => true
             ]);
 
-            // 3. Fetch ALL active triggers with tags (we'll filter groups, not triggers)
-            $all_triggers = API::Trigger()->get([
-                'output' => ['triggerid', 'description', 'priority', 'value'],
+            // 3. Fetch ALL active triggers with tags and lastchange timestamp
+            $trigger_params = [
+                'output' => ['triggerid', 'description', 'priority', 'value', 'lastchange'],
                 'selectHosts' => ['hostid'],
                 'selectTags' => ['tag', 'value'],
                 'filter' => ['value' => TRIGGER_VALUE_TRUE],
                 'monitored' => true,
                 'preservekeys' => true
-            ]);
+            ];
+            
+            // Apply time filter at API level if set (for performance)
+            if ($time_from !== null) {
+                $trigger_params['lastChangeSince'] = $time_from;
+            }
+            if ($time_to !== null) {
+                $trigger_params['lastChangeTill'] = $time_to;
+            }
+            
+            $all_triggers = API::Trigger()->get($trigger_params);
 
             // Collect all unique tags with frequency count for "popular tags"
             $all_tags = [];
@@ -151,7 +205,7 @@ class StatusPageView extends CController {
                 'filtered_groups' => 0
             ];
 
-            $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !empty($filter_alert_name);
+            $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !empty($filter_alert_name) || !empty($filter_time_range);
 
             foreach ($customer_groups as $groupid => $group) {
                 $alert_count = 0;
@@ -171,6 +225,7 @@ class StatusPageView extends CController {
                 $matches_severity = false;
                 $matches_tag = false;
                 $matches_name = false;
+                $matches_time = false;
 
                 if (isset($group_triggers[$groupid])) {
                     $seen_triggers = [];
@@ -204,7 +259,8 @@ class StatusPageView extends CController {
                             'description' => $trigger['description'],
                             'priority' => $priority,
                             'priority_name' => $this->getSeverityName($priority),
-                            'tags' => $trigger['tags'] ?? []
+                            'tags' => $trigger['tags'] ?? [],
+                            'lastchange' => $trigger['lastchange']
                         ];
 
                         // Update statistics
@@ -248,6 +304,11 @@ class StatusPageView extends CController {
                             if (!empty($filter_alert_name) && stripos($trigger['description'], $filter_alert_name) !== false) {
                                 $matches_name = true;
                             }
+                            
+                            // Check time match (if time filter is active, triggers are already filtered by API)
+                            if (!empty($filter_time_range)) {
+                                $matches_time = true; // Already filtered by API
+                            }
                         }
                     }
                 }
@@ -278,9 +339,12 @@ class StatusPageView extends CController {
                         if (!empty($filter_alert_name) && $matches_name) {
                             $include_group = true;
                         }
+                        if (!empty($filter_time_range) && $matches_time) {
+                            $include_group = true;
+                        }
                         
-                        // If no specific filters set, show groups with alerts
-                        if (empty($filter_severities) && empty($filter_tags) && empty($filter_alert_name)) {
+                        // If no specific filters set (only time), show groups with alerts
+                        if (empty($filter_severities) && empty($filter_tags) && empty($filter_alert_name) && !empty($filter_time_range)) {
                             $include_group = !$is_healthy;
                         }
                         
@@ -295,6 +359,9 @@ class StatusPageView extends CController {
                             $include_group = false;
                         }
                         if (!empty($filter_alert_name) && !$matches_name) {
+                            $include_group = false;
+                        }
+                        if (!empty($filter_time_range) && !$matches_time) {
                             $include_group = false;
                         }
                     }
@@ -364,6 +431,9 @@ class StatusPageView extends CController {
                 'filter_tags' => $filter_tags,
                 'filter_alert_name' => $filter_alert_name,
                 'filter_logic' => $filter_logic,
+                'filter_time_range' => $filter_time_range,
+                'filter_time_from' => $filter_time_from,
+                'filter_time_to' => $filter_time_to,
                 'refresh' => $refresh,
                 'error' => null
             ];
@@ -399,6 +469,9 @@ class StatusPageView extends CController {
                 'filter_tags' => $filter_tags,
                 'filter_alert_name' => $filter_alert_name,
                 'filter_logic' => $filter_logic,
+                'filter_time_range' => $filter_time_range,
+                'filter_time_from' => $filter_time_from,
+                'filter_time_to' => $filter_time_to,
                 'refresh' => $refresh,
                 'error' => $e->getMessage()
             ];
