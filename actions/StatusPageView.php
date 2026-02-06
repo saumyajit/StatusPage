@@ -20,7 +20,12 @@ class StatusPageView extends CController {
             'spacing' => 'in normal,compact,ultra-compact',
             'filter_alerts' => 'in 0,1',
             'search' => 'string',
-            'refresh' => 'in 0,1'
+            'refresh' => 'in 0,1',
+            // New filter fields
+            'filter_severities' => 'array',
+            'filter_tags' => 'array',
+            'filter_alert_name' => 'string',
+            'filter_logic' => 'in AND,OR'
         ];
 
         $ret = $this->validateInput($fields);
@@ -43,6 +48,12 @@ class StatusPageView extends CController {
         $filter_alerts = $this->hasInput('filter_alerts') ? (bool)$this->getInput('filter_alerts') : false;
         $search = $this->getInput('search', '');
         $refresh = $this->hasInput('refresh') ? (bool)$this->getInput('refresh') : false;
+        
+        // New filters
+        $filter_severities = $this->getInput('filter_severities', []);
+        $filter_tags = $this->getInput('filter_tags', []);
+        $filter_alert_name = $this->getInput('filter_alert_name', '');
+        $filter_logic = $this->getInput('filter_logic', 'AND');
 
         try {
             // 1. Fetch host groups starting with "CUSTOMER/"
@@ -68,22 +79,72 @@ class StatusPageView extends CController {
                 'preservekeys' => true
             ]);
 
-            // 3. Fetch active triggers with full details
+            // 3. Fetch active triggers with full details including TAGS
             $triggers = API::Trigger()->get([
                 'output' => ['triggerid', 'description', 'priority', 'value'],
                 'selectHosts' => ['hostid'],
+                'selectTags' => ['tag', 'value'],
                 'filter' => ['value' => TRIGGER_VALUE_TRUE],
                 'monitored' => true,
                 'preservekeys' => true
             ]);
 
-            // Map triggers to host groups
+            // Collect all unique tags for filter dropdown
+            $all_tags = [];
+            foreach ($triggers as $trigger) {
+                if (!empty($trigger['tags'])) {
+                    foreach ($trigger['tags'] as $tag) {
+                        $tag_key = $tag['tag'] . (empty($tag['value']) ? '' : ': ' . $tag['value']);
+                        $all_tags[$tag_key] = [
+                            'tag' => $tag['tag'],
+                            'value' => $tag['value'] ?? '',
+                            'display' => $tag_key
+                        ];
+                    }
+                }
+            }
+            // Sort tags alphabetically
+            ksort($all_tags);
+
+            // Map triggers to host groups with filtering
             $group_triggers = [];
             foreach ($triggers as $trigger) {
+                // Apply alert name filter
+                if (!empty($filter_alert_name)) {
+                    if (stripos($trigger['description'], $filter_alert_name) === false) {
+                        continue;
+                    }
+                }
+
+                // Apply severity filter
+                if (!empty($filter_severities)) {
+                    if (!in_array((string)$trigger['priority'], $filter_severities)) {
+                        continue;
+                    }
+                }
+
+                // Apply tag filter
+                if (!empty($filter_tags)) {
+                    $trigger_has_matching_tag = false;
+                    if (!empty($trigger['tags'])) {
+                        foreach ($trigger['tags'] as $trigger_tag) {
+                            $trigger_tag_key = $trigger_tag['tag'] . (empty($trigger_tag['value']) ? '' : ': ' . $trigger_tag['value']);
+                            if (in_array($trigger_tag_key, $filter_tags)) {
+                                $trigger_has_matching_tag = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (!$trigger_has_matching_tag) {
+                        continue;
+                    }
+                }
+
+                // If trigger passes all filters, map to host groups
                 foreach ($trigger['hosts'] as $trigger_host) {
                     $hostid = $trigger_host['hostid'];
                     
-                    // Find which customer groups this host belongs to
                     if (isset($hosts[$hostid])) {
                         $host = $hosts[$hostid];
                         foreach ($host['hostgroups'] as $hg) {
@@ -110,7 +171,8 @@ class StatusPageView extends CController {
                 'high_alerts' => 0,
                 'average_alerts' => 0,
                 'warning_alerts' => 0,
-                'info_alerts' => 0
+                'info_alerts' => 0,
+                'filtered_groups' => 0
             ];
 
             foreach ($customer_groups as $groupid => $group) {
@@ -125,6 +187,7 @@ class StatusPageView extends CController {
                     TRIGGER_SEVERITY_NOT_CLASSIFIED => 0
                 ];
                 $alert_details = [];
+                $group_tags = [];
 
                 if (isset($group_triggers[$groupid])) {
                     $seen_triggers = [];
@@ -144,11 +207,20 @@ class StatusPageView extends CController {
                         
                         $severity_counts[$priority]++;
                         
+                        // Collect tags for this group
+                        if (!empty($trigger['tags'])) {
+                            foreach ($trigger['tags'] as $tag) {
+                                $tag_display = $tag['tag'] . (empty($tag['value']) ? '' : ': ' . $tag['value']);
+                                $group_tags[$tag_display] = true;
+                            }
+                        }
+                        
                         // Store alert details for tooltip
                         $alert_details[] = [
                             'description' => $trigger['description'],
                             'priority' => $priority,
-                            'priority_name' => $this->getSeverityName($priority)
+                            'priority_name' => $this->getSeverityName($priority),
+                            'tags' => $trigger['tags'] ?? []
                         ];
 
                         // Update statistics
@@ -189,12 +261,15 @@ class StatusPageView extends CController {
                     'is_healthy' => $is_healthy,
                     'highest_severity' => $highest_severity,
                     'severity_counts' => $severity_counts,
-                    'alert_details' => $alert_details
+                    'alert_details' => $alert_details,
+                    'tags' => array_keys($group_tags)
                 ];
             }
 
             // Apply filters
-            if ($filter_alerts) {
+            $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !empty($filter_alert_name);
+            
+            if ($filter_alerts || $has_active_filters) {
                 $groups_data = array_filter($groups_data, function($group) {
                     return !$group['is_healthy'];
                 });
@@ -206,6 +281,8 @@ class StatusPageView extends CController {
                     return strpos(mb_strtolower($group['name']), $search_lower) !== false;
                 });
             }
+
+            $statistics['filtered_groups'] = count($groups_data);
 
             // Sort by alert count (descending) then by name
             usort($groups_data, function($a, $b) {
@@ -224,10 +301,15 @@ class StatusPageView extends CController {
             $data = [
                 'statistics' => $statistics,
                 'groups' => $groups_data,
+                'all_tags' => array_values($all_tags),
                 'icon_size' => $icon_size,
                 'spacing' => $spacing,
                 'filter_alerts' => $filter_alerts,
                 'search' => $search,
+                'filter_severities' => $filter_severities,
+                'filter_tags' => $filter_tags,
+                'filter_alert_name' => $filter_alert_name,
+                'filter_logic' => $filter_logic,
                 'refresh' => $refresh,
                 'error' => null
             ];
@@ -249,13 +331,19 @@ class StatusPageView extends CController {
                     'average_alerts' => 0,
                     'warning_alerts' => 0,
                     'info_alerts' => 0,
-                    'health_percentage' => 0
+                    'health_percentage' => 0,
+                    'filtered_groups' => 0
                 ],
                 'groups' => [],
+                'all_tags' => [],
                 'icon_size' => $icon_size,
                 'spacing' => $spacing,
                 'filter_alerts' => $filter_alerts,
                 'search' => $search,
+                'filter_severities' => $filter_severities,
+                'filter_tags' => $filter_tags,
+                'filter_alert_name' => $filter_alert_name,
+                'filter_logic' => $filter_logic,
                 'refresh' => $refresh,
                 'error' => $e->getMessage()
             ];
