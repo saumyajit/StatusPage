@@ -2,10 +2,15 @@
 // Get data from controller
 $statistics = $data['statistics'] ?? [];
 $groups = $data['groups'] ?? [];
+$all_tags = $data['all_tags'] ?? [];
 $icon_size = $data['icon_size'] ?? '30';
 $spacing = $data['spacing'] ?? 'normal';
 $filter_alerts = $data['filter_alerts'] ?? false;
 $search = $data['search'] ?? '';
+$filter_severities = $data['filter_severities'] ?? [];
+$filter_tags = $data['filter_tags'] ?? [];
+$filter_alert_name = $data['filter_alert_name'] ?? '';
+$filter_logic = $data['filter_logic'] ?? 'AND';
 $error = $data['error'] ?? null;
 
 // Spacing values
@@ -15,6 +20,9 @@ $spacing_map = [
     'ultra-compact' => '2px'
 ];
 $gap = $spacing_map[$spacing] ?? '8px';
+
+// Check if filters are active
+$has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !empty($filter_alert_name);
 ?>
 
 <!DOCTYPE html>
@@ -131,6 +139,17 @@ $gap = $spacing_map[$spacing] ?? '8px';
             background: #5a6268;
         }
 
+        .btn-outline {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-outline:hover {
+            background: #667eea;
+            color: white;
+        }
+
         .checkbox-label {
             display: flex;
             align-items: center;
@@ -145,6 +164,190 @@ $gap = $spacing_map[$spacing] ?? '8px';
         .checkbox-label input[type="checkbox"] {
             width: 18px;
             height: 18px;
+            cursor: pointer;
+        }
+
+        /* Advanced Filters Section */
+        .advanced-filters {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .filter-header {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .filter-header:hover {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        }
+
+        .filter-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .filter-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-badge {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .filter-toggle {
+            font-size: 18px;
+            transition: transform 0.3s;
+        }
+
+        .filter-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .filter-body {
+            padding: 20px;
+            display: none;
+        }
+
+        .filter-body.expanded {
+            display: block;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            font-size: 13px;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .filter-input {
+            padding: 10px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            background: white;
+            font-size: 13px;
+            transition: border-color 0.2s;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .multi-select {
+            min-height: 120px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .multi-select-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .multi-select-option:hover {
+            background: #f0f0f0;
+        }
+
+        .multi-select-option input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .multi-select-option label {
+            cursor: pointer;
+            flex: 1;
+            font-size: 13px;
+            color: #495057;
+        }
+
+        .severity-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .severity-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .severity-disaster { background: #d32f2f; }
+        .severity-high { background: #f44336; }
+        .severity-average { background: #f57c00; }
+        .severity-warning { background: #fbc02d; }
+        .severity-info { background: #2196f3; }
+        .severity-not-classified { background: #9e9e9e; }
+
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .logic-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #ced4da;
+        }
+
+        .logic-option {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+
+        .logic-option input[type="radio"] {
             cursor: pointer;
         }
 
@@ -338,11 +541,11 @@ $gap = $spacing_map[$spacing] ?? '8px';
             padding: 3px 0;
         }
 
-        .severity-disaster { color: #d32f2f; font-weight: 600; }
-        .severity-high { color: #f44336; font-weight: 600; }
-        .severity-average { color: #f57c00; font-weight: 600; }
-        .severity-warning { color: #fbc02d; font-weight: 600; }
-        .severity-info { color: #2196f3; font-weight: 600; }
+        .severity-disaster-text { color: #d32f2f; font-weight: 600; }
+        .severity-high-text { color: #f44336; font-weight: 600; }
+        .severity-average-text { color: #f57c00; font-weight: 600; }
+        .severity-warning-text { color: #fbc02d; font-weight: 600; }
+        .severity-info-text { color: #2196f3; font-weight: 600; }
 
         /* Legend */
         .legend {
@@ -485,6 +688,10 @@ $gap = $spacing_map[$spacing] ?? '8px';
             .search-input {
                 min-width: 100%;
             }
+
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -496,31 +703,20 @@ $gap = $spacing_map[$spacing] ?? '8px';
             <p class="page-subtitle"><?= _('Visual overview of customer host groups') ?></p>
         </div>
 
-        <!-- Controls -->
+        <!-- Main Controls -->
         <div class="controls-section">
-            <form method="GET" action="zabbix.php" id="filterForm">
+            <form method="GET" action="zabbix.php" id="mainForm">
                 <input type="hidden" name="action" value="status.page">
                 
                 <div class="controls-row">
                     <div class="control-group">
-                        <label for="search"><?= _('Filter Groups:') ?></label>
+                        <label for="search"><?= _('Search Groups:') ?></label>
                         <input type="text" 
                                id="search" 
                                name="search" 
                                class="control-input search-input" 
                                placeholder="<?= _('Search host groups...') ?>"
                                value="<?= htmlspecialchars($search) ?>">
-                    </div>
-
-                    <div class="control-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" 
-                                   name="filter_alerts" 
-                                   value="1" 
-                                   id="filter_alerts"
-                                   <?= $filter_alerts ? 'checked' : '' ?>>
-                            <?= _('Show: Customer Groups Only') ?>
-                        </label>
                     </div>
 
                     <div class="control-group">
@@ -556,12 +752,148 @@ $gap = $spacing_map[$spacing] ?? '8px';
             </form>
         </div>
 
+        <!-- Advanced Filters -->
+        <div class="advanced-filters">
+            <div class="filter-header" id="filterHeader">
+                <div class="filter-header-left">
+                    <span class="filter-toggle <?= $has_active_filters ? '' : 'collapsed' ?>" id="filterToggle">▼</span>
+                    <div class="filter-title">
+                        <span>🔍 <?= _('Advanced Filters') ?></span>
+                        <?php if ($has_active_filters): ?>
+                            <span class="filter-badge"><?= _('Active') ?></span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <span style="font-size: 12px; color: #666;">
+                    <?= $has_active_filters ? _('Click to collapse') : _('Click to expand') ?>
+                </span>
+            </div>
+            
+            <div class="filter-body <?= $has_active_filters ? 'expanded' : '' ?>" id="filterBody">
+                <form method="GET" action="zabbix.php" id="filterForm">
+                    <input type="hidden" name="action" value="status.page">
+                    <input type="hidden" name="icon_size" value="<?= htmlspecialchars($icon_size) ?>">
+                    <input type="hidden" name="spacing" value="<?= htmlspecialchars($spacing) ?>">
+                    <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                    
+                    <div class="filter-grid">
+                        <!-- Alert Severity Filter -->
+                        <div class="filter-field">
+                            <label class="filter-label">
+                                ⚠️ <?= _('Alert Severity') ?>
+                            </label>
+                            <div class="filter-input multi-select">
+                                <?php
+                                $severities = [
+                                    TRIGGER_SEVERITY_DISASTER => ['name' => _('Disaster'), 'class' => 'disaster'],
+                                    TRIGGER_SEVERITY_HIGH => ['name' => _('High'), 'class' => 'high'],
+                                    TRIGGER_SEVERITY_AVERAGE => ['name' => _('Average'), 'class' => 'average'],
+                                    TRIGGER_SEVERITY_WARNING => ['name' => _('Warning'), 'class' => 'warning'],
+                                    TRIGGER_SEVERITY_INFORMATION => ['name' => _('Information'), 'class' => 'info'],
+                                    TRIGGER_SEVERITY_NOT_CLASSIFIED => ['name' => _('Not classified'), 'class' => 'not-classified']
+                                ];
+                                foreach ($severities as $sev_value => $sev_info):
+                                    $checked = in_array((string)$sev_value, $filter_severities);
+                                ?>
+                                <div class="multi-select-option">
+                                    <input type="checkbox" 
+                                           name="filter_severities[]" 
+                                           value="<?= $sev_value ?>" 
+                                           id="sev_<?= $sev_value ?>"
+                                           <?= $checked ? 'checked' : '' ?>>
+                                    <label for="sev_<?= $sev_value ?>" class="severity-label">
+                                        <span class="severity-dot severity-<?= $sev_info['class'] ?>"></span>
+                                        <?= $sev_info['name'] ?>
+                                    </label>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <!-- Alert Tags Filter -->
+                        <div class="filter-field">
+                            <label class="filter-label">
+                                🏷️ <?= _('Alert Tags') ?>
+                            </label>
+                            <div class="filter-input multi-select">
+                                <?php if (empty($all_tags)): ?>
+                                    <div style="padding: 20px; text-align: center; color: #999; font-size: 12px;">
+                                        <?= _('No tags available') ?>
+                                    </div>
+                                <?php else: ?>
+                                    <?php foreach ($all_tags as $tag): 
+                                        $checked = in_array($tag['display'], $filter_tags);
+                                    ?>
+                                    <div class="multi-select-option">
+                                        <input type="checkbox" 
+                                               name="filter_tags[]" 
+                                               value="<?= htmlspecialchars($tag['display']) ?>" 
+                                               id="tag_<?= md5($tag['display']) ?>"
+                                               <?= $checked ? 'checked' : '' ?>>
+                                        <label for="tag_<?= md5($tag['display']) ?>">
+                                            <?= htmlspecialchars($tag['display']) ?>
+                                        </label>
+                                    </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <!-- Alert Name Filter -->
+                        <div class="filter-field">
+                            <label class="filter-label" for="filter_alert_name">
+                                📝 <?= _('Alert Name (contains)') ?>
+                            </label>
+                            <input type="text" 
+                                   id="filter_alert_name" 
+                                   name="filter_alert_name" 
+                                   class="filter-input" 
+                                   placeholder="<?= _('Search in alert descriptions...') ?>"
+                                   value="<?= htmlspecialchars($filter_alert_name) ?>">
+                        </div>
+                    </div>
+
+                    <div class="filter-actions">
+                        <div class="logic-selector">
+                            <span style="font-weight: 600; font-size: 13px; color: #495057;"><?= _('Filter Logic:') ?></span>
+                            <div class="logic-option">
+                                <input type="radio" 
+                                       name="filter_logic" 
+                                       value="AND" 
+                                       id="logic_and"
+                                       <?= $filter_logic === 'AND' ? 'checked' : '' ?>>
+                                <label for="logic_and" style="cursor: pointer; font-size: 13px;">AND (all match)</label>
+                            </div>
+                            <div class="logic-option">
+                                <input type="radio" 
+                                       name="filter_logic" 
+                                       value="OR" 
+                                       id="logic_or"
+                                       <?= $filter_logic === 'OR' ? 'checked' : '' ?>>
+                                <label for="logic_or" style="cursor: pointer; font-size: 13px;">OR (any match)</label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <span>✓</span>
+                            <?= _('Apply Filters') ?>
+                        </button>
+
+                        <button type="button" class="btn btn-outline" id="clearFilters">
+                            <span>✕</span>
+                            <?= _('Clear All') ?>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- Statistics -->
         <div class="statistics-section">
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-value"><?= $statistics['total_groups'] ?></div>
-                    <div class="stat-label"><?= _('HOST GROUPS') ?></div>
+                    <div class="stat-label"><?= _('TOTAL GROUPS') ?></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value"><?= $statistics['healthy_groups'] ?></div>
@@ -570,6 +902,10 @@ $gap = $spacing_map[$spacing] ?? '8px';
                 <div class="stat-card">
                     <div class="stat-value"><?= $statistics['groups_with_alerts'] ?></div>
                     <div class="stat-label"><?= _('WITH ALERTS') ?></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value"><?= $statistics['filtered_groups'] ?></div>
+                    <div class="stat-label"><?= _('SHOWING') ?></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value"><?= $statistics['health_percentage'] ?>%</div>
@@ -593,27 +929,27 @@ $gap = $spacing_map[$spacing] ?? '8px';
                 <div class="legend-items">
                     <div class="legend-item">
                         <span class="legend-dot status-healthy"></span>
-                        <span class="legend-text"><?= _('Healthy (No alerts)') ?></span>
+                        <span class="legend-text"><?= _('Healthy') ?></span>
                     </div>
                     <div class="legend-item">
                         <span class="legend-dot status-warning"></span>
-                        <span class="legend-text"><?= _('Warning alerts') ?></span>
+                        <span class="legend-text"><?= _('Warning') ?></span>
                     </div>
                     <div class="legend-item">
                         <span class="legend-dot status-average"></span>
-                        <span class="legend-text"><?= _('Average alerts') ?></span>
+                        <span class="legend-text"><?= _('Average') ?></span>
                     </div>
                     <div class="legend-item">
                         <span class="legend-dot status-high"></span>
-                        <span class="legend-text"><?= _('High alerts') ?></span>
+                        <span class="legend-text"><?= _('High') ?></span>
                     </div>
                     <div class="legend-item">
                         <span class="legend-dot status-disaster"></span>
-                        <span class="legend-text"><?= _('Critical alerts') ?></span>
+                        <span class="legend-text"><?= _('Disaster') ?></span>
                     </div>
                     <div class="legend-item">
                         <span style="display: inline-block; width: 20px; height: 14px; border-radius: 8px; background: rgba(255,255,255,0.95); border: 1px solid #333; text-align: center; font-size: 9px; line-height: 13px; font-weight: bold;">2</span>
-                        <span class="legend-text"><?= _('Alert count badge') ?></span>
+                        <span class="legend-text"><?= _('Alert count') ?></span>
                     </div>
                 </div>
             </div>
@@ -664,7 +1000,9 @@ $gap = $spacing_map[$spacing] ?? '8px';
                     <div class="empty-state">
                         <div class="empty-state-icon">📊</div>
                         <div class="empty-state-text"><?= _('No host groups found') ?></div>
-                        <div class="empty-state-subtext"><?= _('Showing 3 groups') ?></div>
+                        <div class="empty-state-subtext">
+                            <?= $has_active_filters ? _('Try adjusting your filters') : _('No CUSTOMER/ groups available') ?>
+                        </div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -686,6 +1024,16 @@ $gap = $spacing_map[$spacing] ?? '8px';
 
         const tooltip = document.getElementById('tooltip');
         let currentCircle = null;
+
+        // Filter panel toggle
+        const filterHeader = document.getElementById('filterHeader');
+        const filterBody = document.getElementById('filterBody');
+        const filterToggle = document.getElementById('filterToggle');
+
+        filterHeader.addEventListener('click', function() {
+            filterBody.classList.toggle('expanded');
+            filterToggle.classList.toggle('collapsed');
+        });
 
         // Tooltip handling
         document.querySelectorAll('.status-circle').forEach(circle => {
@@ -725,20 +1073,20 @@ $gap = $spacing_map[$spacing] ?? '8px';
                 html += '<div class="tooltip-severity-list">';
                 
                 if (data.severityCounts[5] > 0) {
-                    html += '<div class="severity-item"><span class="severity-disaster">⚠ Disaster:</span> <span>' + data.severityCounts[5] + '</span></div>';
+                    html += '<div class="severity-item"><span class="severity-disaster-text">⚠ Disaster:</span> <span>' + data.severityCounts[5] + '</span></div>';
                 }
                 if (data.severityCounts[4] > 0) {
-                    html += '<div class="severity-item"><span class="severity-high">⚠ High:</span> <span>' + data.severityCounts[4] + '</span></div>';
+                    html += '<div class="severity-item"><span class="severity-high-text">⚠ High:</span> <span>' + data.severityCounts[4] + '</span></div>';
                 }
                 if (data.severityCounts[3] > 0) {
-                    html += '<div class="severity-item"><span class="severity-average">⚠ Average:</span> <span>' + data.severityCounts[3] + '</span></div>';
+                    html += '<div class="severity-item"><span class="severity-average-text">⚠ Average:</span> <span>' + data.severityCounts[3] + '</span></div>';
                 }
                 if (data.severityCounts[2] > 0) {
-                    html += '<div class="severity-item"><span class="severity-warning">⚠ Warning:</span> <span>' + data.severityCounts[2] + '</span></div>';
+                    html += '<div class="severity-item"><span class="severity-warning-text">⚠ Warning:</span> <span>' + data.severityCounts[2] + '</span></div>';
                 }
                 if (data.severityCounts[1] > 0 || data.severityCounts[0] > 0) {
                     const infoTotal = (data.severityCounts[1] || 0) + (data.severityCounts[0] || 0);
-                    html += '<div class="severity-item"><span class="severity-info">ℹ Info:</span> <span>' + infoTotal + '</span></div>';
+                    html += '<div class="severity-item"><span class="severity-info-text">ℹ Info:</span> <span>' + infoTotal + '</span></div>';
                 }
                 
                 html += '</div></div>';
@@ -780,29 +1128,31 @@ $gap = $spacing_map[$spacing] ?? '8px';
             return div.innerHTML;
         }
 
-        // Refresh button
-        document.getElementById('refreshBtn').addEventListener('click', function() {
+        // Refresh button - FIXED
+        document.getElementById('refreshBtn').addEventListener('click', function(e) {
+            e.preventDefault();
             document.getElementById('loadingOverlay').classList.add('active');
-            const form = document.getElementById('filterForm');
-            const url = new URL(form.action, window.location.origin);
-            const formData = new FormData(form);
-            formData.append('refresh', '1');
             
-            const params = new URLSearchParams(formData);
-            window.location.href = url.pathname + '?' + params.toString();
+            // Get current URL parameters
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.set('refresh', '1');
+            
+            window.location.href = currentUrl.toString();
+        });
+
+        // Clear filters button
+        document.getElementById('clearFilters').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = 'zabbix.php?action=status.page';
         });
 
         // Auto-submit on select change
         document.getElementById('icon_size').addEventListener('change', function() {
-            document.getElementById('filterForm').submit();
+            document.getElementById('mainForm').submit();
         });
 
         document.getElementById('spacing').addEventListener('change', function() {
-            document.getElementById('filterForm').submit();
-        });
-
-        document.getElementById('filter_alerts').addEventListener('change', function() {
-            document.getElementById('filterForm').submit();
+            document.getElementById('mainForm').submit();
         });
 
         // Keyboard shortcuts
