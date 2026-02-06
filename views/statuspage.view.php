@@ -3,6 +3,7 @@
 $statistics = $data['statistics'] ?? [];
 $groups = $data['groups'] ?? [];
 $all_tags = $data['all_tags'] ?? [];
+$popular_tags = $data['popular_tags'] ?? [];
 $icon_size = $data['icon_size'] ?? '30';
 $spacing = $data['spacing'] ?? 'normal';
 $filter_alerts = $data['filter_alerts'] ?? false;
@@ -10,7 +11,7 @@ $search = $data['search'] ?? '';
 $filter_severities = $data['filter_severities'] ?? [];
 $filter_tags = $data['filter_tags'] ?? [];
 $filter_alert_name = $data['filter_alert_name'] ?? '';
-$filter_logic = $data['filter_logic'] ?? 'AND';
+$filter_logic = $data['filter_logic'] ?? 'OR';
 $error = $data['error'] ?? null;
 
 // Spacing values
@@ -23,12 +24,19 @@ $gap = $spacing_map[$spacing] ?? '8px';
 
 // Check if filters are active
 $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !empty($filter_alert_name);
+
+// Encode data for JavaScript
+$all_tags_json = json_encode(array_column($all_tags, 'display'));
+$popular_tags_json = json_encode($popular_tags);
+$selected_tags_json = json_encode($filter_tags);
 ?>
 
 <!DOCTYPE html>
 <html>
 <head>
     <style>
+        * { box-sizing: border-box; }
+        
         .status-page-wrapper {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             padding: 20px;
@@ -36,6 +44,7 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             min-height: 100vh;
         }
 
+        /* Header with Legend */
         .page-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -49,13 +58,49 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             margin: 0 0 8px 0;
             font-size: 28px;
             font-weight: 600;
+            text-align: center;
         }
 
         .page-subtitle {
             font-size: 14px;
             opacity: 0.95;
-            margin: 0;
+            margin: 0 0 15px 0;
+            text-align: center;
         }
+
+        .header-legend {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 25px;
+            flex-wrap: wrap;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            font-size: 13px;
+        }
+
+        .header-legend-label {
+            font-weight: 600;
+            margin-right: 5px;
+        }
+
+        .header-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-legend-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+        }
+
+        .legend-healthy { background: #4caf50; }
+        .legend-warning { background: #fbc02d; }
+        .legend-average { background: #f57c00; }
+        .legend-high { background: #f44336; }
+        .legend-disaster { background: #d32f2f; }
 
         /* Controls Section */
         .controls-section {
@@ -150,24 +195,7 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             color: white;
         }
 
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            user-select: none;
-            font-size: 13px;
-            font-weight: 600;
-            color: #495057;
-        }
-
-        .checkbox-label input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        /* Advanced Filters Section */
+        /* Advanced Filters */
         .advanced-filters {
             background: #f8f9fa;
             border: 1px solid #dee2e6;
@@ -270,49 +298,50 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-        .multi-select {
-            min-height: 120px;
-            max-height: 200px;
-            overflow-y: auto;
-            padding: 8px;
+        /* Severity Grid (2x2) */
+        .severity-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            padding: 10px;
         }
 
-        .multi-select-option {
+        .severity-option {
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 6px 8px;
-            cursor: pointer;
+            padding: 10px;
             border-radius: 4px;
+            cursor: pointer;
             transition: background 0.2s;
         }
 
-        .multi-select-option:hover {
+        .severity-option:hover {
             background: #f0f0f0;
         }
 
-        .multi-select-option input[type="checkbox"] {
+        .severity-option input[type="checkbox"] {
             width: 16px;
             height: 16px;
             cursor: pointer;
         }
 
-        .multi-select-option label {
+        .severity-option label {
             cursor: pointer;
             flex: 1;
             font-size: 13px;
             color: #495057;
-        }
-
-        .severity-label {
             display: flex;
             align-items: center;
             gap: 6px;
         }
 
         .severity-dot {
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
         }
 
@@ -320,14 +349,135 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
         .severity-high { background: #f44336; }
         .severity-average { background: #f57c00; }
         .severity-warning { background: #fbc02d; }
-        .severity-info { background: #2196f3; }
-        .severity-not-classified { background: #9e9e9e; }
 
-        .filter-actions {
+        /* Tag Autocomplete */
+        .tag-autocomplete-container {
+            position: relative;
+        }
+
+        .tag-input-wrapper {
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            padding: 8px;
+            min-height: 80px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .tag-input-wrapper:focus-within {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .selected-tags {
             display: flex;
-            gap: 10px;
-            padding-top: 15px;
-            border-top: 1px solid #dee2e6;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .tag-chip {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tag-chip-remove {
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: white;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            line-height: 1;
+            transition: background 0.2s;
+        }
+
+        .tag-chip-remove:hover {
+            background: rgba(255,255,255,0.5);
+        }
+
+        .tag-input {
+            border: none;
+            outline: none;
+            padding: 6px;
+            font-size: 13px;
+            min-width: 200px;
+            width: 100%;
+        }
+
+        .tag-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            margin-top: 4px;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: none;
+        }
+
+        .tag-suggestions.visible {
+            display: block;
+        }
+
+        .tag-suggestions-section {
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .tag-suggestions-section:last-child {
+            border-bottom: none;
+        }
+
+        .tag-suggestions-header {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tag-suggestion-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 13px;
+            color: #495057;
+        }
+
+        .tag-suggestion-item:hover {
+            background: #f0f0f0;
+        }
+
+        .tag-suggestion-item.selected {
+            background: #e7f0ff;
+        }
+
+        .tag-suggestion-popular {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .tag-suggestion-recent {
+            color: #28a745;
         }
 
         .logic-selector {
@@ -351,7 +501,14 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             cursor: pointer;
         }
 
-        /* Statistics Section */
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+
+        /* Statistics */
         .statistics-section {
             background: white;
             padding: 20px;
@@ -394,7 +551,7 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             letter-spacing: 0.5px;
         }
 
-        /* Status Page Section */
+        /* Status Page */
         .status-page-section {
             background: white;
             padding: 20px;
@@ -436,25 +593,11 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
         }
 
         /* Status Colors */
-        .status-healthy {
-            background: #4caf50;
-        }
-
-        .status-warning {
-            background: #fbc02d;
-        }
-
-        .status-average {
-            background: #f57c00;
-        }
-
-        .status-high {
-            background: #f44336;
-        }
-
-        .status-disaster {
-            background: #d32f2f;
-        }
+        .status-healthy { background: #4caf50; }
+        .status-warning { background: #fbc02d; }
+        .status-average { background: #f57c00; }
+        .status-high { background: #f44336; }
+        .status-disaster { background: #d32f2f; }
 
         /* Alert Badge */
         .alert-badge {
@@ -482,7 +625,7 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             padding: 12px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
             z-index: 10000;
-            max-width: 400px;
+            max-width: 350px;
             border: 2px solid #e0e0e0;
             opacity: 0;
             visibility: hidden;
@@ -499,14 +642,8 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
         .tooltip-header {
             font-size: 15px;
             font-weight: 700;
-            margin-bottom: 4px;
+            margin-bottom: 10px;
             color: #333;
-        }
-
-        .tooltip-subheader {
-            font-size: 11px;
-            color: #666;
-            margin-bottom: 8px;
             padding-bottom: 8px;
             border-bottom: 2px solid #e0e0e0;
         }
@@ -545,46 +682,6 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
         .severity-high-text { color: #f44336; font-weight: 600; }
         .severity-average-text { color: #f57c00; font-weight: 600; }
         .severity-warning-text { color: #fbc02d; font-weight: 600; }
-        .severity-info-text { color: #2196f3; font-weight: 600; }
-
-        /* Legend */
-        .legend {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            border: 1px solid #dee2e6;
-        }
-
-        .legend-title {
-            font-weight: 600;
-            color: #495057;
-            margin-bottom: 10px;
-            font-size: 14px;
-        }
-
-        .legend-items {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .legend-dot {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-        }
-
-        .legend-text {
-            font-size: 13px;
-            color: #495057;
-        }
 
         /* Empty State */
         .empty-state {
@@ -622,12 +719,6 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             background: #f8d7da;
             border-color: #dc3545;
             color: #721c24;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            border-color: #28a745;
-            color: #155724;
         }
 
         /* Loading Overlay */
@@ -692,15 +783,52 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             .filter-grid {
                 grid-template-columns: 1fr;
             }
+
+            .severity-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-legend {
+                font-size: 11px;
+                gap: 15px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="status-page-wrapper">
-        <!-- Header -->
+        <!-- Header with Legend -->
         <div class="page-header">
             <h1><?= _('Status Dashboard') ?></h1>
             <p class="page-subtitle"><?= _('Visual overview of customer host groups') ?></p>
+            
+            <div class="header-legend">
+                <span class="header-legend-label"><?= _('Legend:') ?></span>
+                <div class="header-legend-item">
+                    <span class="header-legend-dot legend-healthy"></span>
+                    <span><?= _('Healthy') ?></span>
+                </div>
+                <div class="header-legend-item">
+                    <span class="header-legend-dot legend-warning"></span>
+                    <span><?= _('Warning') ?></span>
+                </div>
+                <div class="header-legend-item">
+                    <span class="header-legend-dot legend-average"></span>
+                    <span><?= _('Average') ?></span>
+                </div>
+                <div class="header-legend-item">
+                    <span class="header-legend-dot legend-high"></span>
+                    <span><?= _('High') ?></span>
+                </div>
+                <div class="header-legend-item">
+                    <span class="header-legend-dot legend-disaster"></span>
+                    <span><?= _('Disaster') ?></span>
+                </div>
+                <div class="header-legend-item">
+                    <span style="display: inline-block; width: 18px; height: 14px; border-radius: 6px; background: rgba(255,255,255,0.95); color: #333; text-align: center; font-size: 9px; line-height: 14px; font-weight: bold; border: 1px solid rgba(255,255,255,0.5);">2</span>
+                    <span><?= _('Alert count') ?></span>
+                </div>
+            </div>
         </div>
 
         <!-- Main Controls -->
@@ -777,31 +905,29 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
                     <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
                     
                     <div class="filter-grid">
-                        <!-- Alert Severity Filter -->
+                        <!-- Alert Severity Filter (2x2 Grid) -->
                         <div class="filter-field">
                             <label class="filter-label">
                                 ⚠️ <?= _('Alert Severity') ?>
                             </label>
-                            <div class="filter-input multi-select">
+                            <div class="severity-grid">
                                 <?php
                                 $severities = [
                                     TRIGGER_SEVERITY_DISASTER => ['name' => _('Disaster'), 'class' => 'disaster'],
                                     TRIGGER_SEVERITY_HIGH => ['name' => _('High'), 'class' => 'high'],
                                     TRIGGER_SEVERITY_AVERAGE => ['name' => _('Average'), 'class' => 'average'],
-                                    TRIGGER_SEVERITY_WARNING => ['name' => _('Warning'), 'class' => 'warning'],
-                                    TRIGGER_SEVERITY_INFORMATION => ['name' => _('Information'), 'class' => 'info'],
-                                    TRIGGER_SEVERITY_NOT_CLASSIFIED => ['name' => _('Not classified'), 'class' => 'not-classified']
+                                    TRIGGER_SEVERITY_WARNING => ['name' => _('Warning'), 'class' => 'warning']
                                 ];
                                 foreach ($severities as $sev_value => $sev_info):
                                     $checked = in_array((string)$sev_value, $filter_severities);
                                 ?>
-                                <div class="multi-select-option">
+                                <div class="severity-option">
                                     <input type="checkbox" 
                                            name="filter_severities[]" 
                                            value="<?= $sev_value ?>" 
                                            id="sev_<?= $sev_value ?>"
                                            <?= $checked ? 'checked' : '' ?>>
-                                    <label for="sev_<?= $sev_value ?>" class="severity-label">
+                                    <label for="sev_<?= $sev_value ?>">
                                         <span class="severity-dot severity-<?= $sev_info['class'] ?>"></span>
                                         <?= $sev_info['name'] ?>
                                     </label>
@@ -810,32 +936,21 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
                             </div>
                         </div>
 
-                        <!-- Alert Tags Filter -->
+                        <!-- Alert Tags Filter (Autocomplete) -->
                         <div class="filter-field">
                             <label class="filter-label">
                                 🏷️ <?= _('Alert Tags') ?>
                             </label>
-                            <div class="filter-input multi-select">
-                                <?php if (empty($all_tags)): ?>
-                                    <div style="padding: 20px; text-align: center; color: #999; font-size: 12px;">
-                                        <?= _('No tags available') ?>
-                                    </div>
-                                <?php else: ?>
-                                    <?php foreach ($all_tags as $tag): 
-                                        $checked = in_array($tag['display'], $filter_tags);
-                                    ?>
-                                    <div class="multi-select-option">
-                                        <input type="checkbox" 
-                                               name="filter_tags[]" 
-                                               value="<?= htmlspecialchars($tag['display']) ?>" 
-                                               id="tag_<?= md5($tag['display']) ?>"
-                                               <?= $checked ? 'checked' : '' ?>>
-                                        <label for="tag_<?= md5($tag['display']) ?>">
-                                            <?= htmlspecialchars($tag['display']) ?>
-                                        </label>
-                                    </div>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
+                            <div class="tag-autocomplete-container">
+                                <div class="tag-input-wrapper">
+                                    <div class="selected-tags" id="selectedTags"></div>
+                                    <input type="text" 
+                                           id="tagInput" 
+                                           class="tag-input" 
+                                           placeholder="<?= _('Type to search tags...') ?>"
+                                           autocomplete="off">
+                                </div>
+                                <div class="tag-suggestions" id="tagSuggestions"></div>
                             </div>
                         </div>
 
@@ -859,18 +974,18 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
                             <div class="logic-option">
                                 <input type="radio" 
                                        name="filter_logic" 
-                                       value="AND" 
-                                       id="logic_and"
-                                       <?= $filter_logic === 'AND' ? 'checked' : '' ?>>
-                                <label for="logic_and" style="cursor: pointer; font-size: 13px;">AND (all match)</label>
-                            </div>
-                            <div class="logic-option">
-                                <input type="radio" 
-                                       name="filter_logic" 
                                        value="OR" 
                                        id="logic_or"
                                        <?= $filter_logic === 'OR' ? 'checked' : '' ?>>
                                 <label for="logic_or" style="cursor: pointer; font-size: 13px;">OR (any match)</label>
+                            </div>
+                            <div class="logic-option">
+                                <input type="radio" 
+                                       name="filter_logic" 
+                                       value="AND" 
+                                       id="logic_and"
+                                       <?= $filter_logic === 'AND' ? 'checked' : '' ?>>
+                                <label for="logic_and" style="cursor: pointer; font-size: 13px;">AND (all match)</label>
                             </div>
                         </div>
 
@@ -923,37 +1038,6 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
 
         <!-- Status Page -->
         <div class="status-page-section">
-            <!-- Legend -->
-            <div class="legend">
-                <div class="legend-title"><?= _('Legend:') ?></div>
-                <div class="legend-items">
-                    <div class="legend-item">
-                        <span class="legend-dot status-healthy"></span>
-                        <span class="legend-text"><?= _('Healthy') ?></span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-dot status-warning"></span>
-                        <span class="legend-text"><?= _('Warning') ?></span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-dot status-average"></span>
-                        <span class="legend-text"><?= _('Average') ?></span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-dot status-high"></span>
-                        <span class="legend-text"><?= _('High') ?></span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-dot status-disaster"></span>
-                        <span class="legend-text"><?= _('Disaster') ?></span>
-                    </div>
-                    <div class="legend-item">
-                        <span style="display: inline-block; width: 20px; height: 14px; border-radius: 8px; background: rgba(255,255,255,0.95); border: 1px solid #333; text-align: center; font-size: 9px; line-height: 13px; font-weight: bold;">2</span>
-                        <span class="legend-text"><?= _('Alert count') ?></span>
-                    </div>
-                </div>
-            </div>
-
             <div class="status-grid-container">
                 <?php if (!empty($groups)): ?>
                     <div class="status-grid">
@@ -979,7 +1063,6 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
                             
                             $tooltip_data = [
                                 'name' => $group['short_name'],
-                                'fullName' => $group['name'],
                                 'alertCount' => $group['alert_count'],
                                 'isHealthy' => $group['is_healthy'],
                                 'severityCounts' => $group['severity_counts']
@@ -1022,9 +1105,173 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
     (function() {
         'use strict';
 
-        const tooltip = document.getElementById('tooltip');
-        let currentCircle = null;
-
+        // Data from PHP
+        const allTags = <?= $all_tags_json ?>;
+        const popularTags = <?= $popular_tags_json ?>;
+        const selectedTagsInitial = <?= $selected_tags_json ?>;
+        
+        // Tag autocomplete functionality
+        let selectedTags = [...selectedTagsInitial];
+        let recentTags = JSON.parse(localStorage.getItem('zabbix_status_recent_tags') || '[]');
+        
+        const tagInput = document.getElementById('tagInput');
+        const selectedTagsContainer = document.getElementById('selectedTags');
+        const tagSuggestions = document.getElementById('tagSuggestions');
+        
+        // Initialize
+        renderSelectedTags();
+        
+        // Tag input events
+        tagInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            
+            if (searchTerm.length === 0) {
+                showDefaultSuggestions();
+            } else {
+                const filtered = allTags.filter(tag => 
+                    tag.toLowerCase().includes(searchTerm) &&
+                    !selectedTags.includes(tag)
+                );
+                showSuggestions(filtered, searchTerm);
+            }
+        });
+        
+        tagInput.addEventListener('focus', function() {
+            if (tagInput.value.length === 0) {
+                showDefaultSuggestions();
+            }
+        });
+        
+        tagInput.addEventListener('blur', function() {
+            setTimeout(() => hideSuggestions(), 200);
+        });
+        
+        function showDefaultSuggestions() {
+            let html = '';
+            
+            // Recent tags (last 5)
+            if (recentTags.length > 0) {
+                const recentAvailable = recentTags.filter(tag => !selectedTags.includes(tag)).slice(0, 5);
+                if (recentAvailable.length > 0) {
+                    html += '<div class="tag-suggestions-section">';
+                    html += '<div class="tag-suggestions-header">Recently Used</div>';
+                    recentAvailable.forEach(tag => {
+                        html += `<div class="tag-suggestion-item tag-suggestion-recent" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</div>`;
+                    });
+                    html += '</div>';
+                }
+            }
+            
+            // Popular tags (top 10)
+            if (popularTags.length > 0) {
+                const popularAvailable = popularTags.filter(tag => !selectedTags.includes(tag)).slice(0, 10);
+                if (popularAvailable.length > 0) {
+                    html += '<div class="tag-suggestions-section">';
+                    html += '<div class="tag-suggestions-header">Popular Tags</div>';
+                    popularAvailable.forEach(tag => {
+                        html += `<div class="tag-suggestion-item tag-suggestion-popular" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</div>`;
+                    });
+                    html += '</div>';
+                }
+            }
+            
+            if (html) {
+                tagSuggestions.innerHTML = html;
+                tagSuggestions.classList.add('visible');
+                bindSuggestionClicks();
+            }
+        }
+        
+        function showSuggestions(tags, searchTerm) {
+            if (tags.length === 0) {
+                hideSuggestions();
+                return;
+            }
+            
+            let html = '<div class="tag-suggestions-section">';
+            html += '<div class="tag-suggestions-header">Matching Tags (' + tags.length + ')</div>';
+            tags.slice(0, 50).forEach(tag => {
+                html += `<div class="tag-suggestion-item" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</div>`;
+            });
+            if (tags.length > 50) {
+                html += `<div class="tag-suggestion-item" style="text-align:center; color:#999; font-style:italic;">+ ${tags.length - 50} more...</div>`;
+            }
+            html += '</div>';
+            
+            tagSuggestions.innerHTML = html;
+            tagSuggestions.classList.add('visible');
+            bindSuggestionClicks();
+        }
+        
+        function hideSuggestions() {
+            tagSuggestions.classList.remove('visible');
+        }
+        
+        function bindSuggestionClicks() {
+            document.querySelectorAll('.tag-suggestion-item[data-tag]').forEach(item => {
+                item.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    const tag = this.dataset.tag;
+                    addTag(tag);
+                });
+            });
+        }
+        
+        function addTag(tag) {
+            if (!selectedTags.includes(tag)) {
+                selectedTags.push(tag);
+                
+                // Update recent tags
+                recentTags = recentTags.filter(t => t !== tag);
+                recentTags.unshift(tag);
+                recentTags = recentTags.slice(0, 10);
+                localStorage.setItem('zabbix_status_recent_tags', JSON.stringify(recentTags));
+                
+                renderSelectedTags();
+                tagInput.value = '';
+                hideSuggestions();
+                tagInput.focus();
+            }
+        }
+        
+        function removeTag(tag) {
+            selectedTags = selectedTags.filter(t => t !== tag);
+            renderSelectedTags();
+        }
+        
+        function renderSelectedTags() {
+            // Render chips
+            let html = '';
+            selectedTags.forEach(tag => {
+                html += `
+                    <div class="tag-chip">
+                        <span>${escapeHtml(tag)}</span>
+                        <button type="button" class="tag-chip-remove" data-tag="${escapeHtml(tag)}">✕</button>
+                    </div>
+                `;
+            });
+            selectedTagsContainer.innerHTML = html;
+            
+            // Bind remove buttons
+            document.querySelectorAll('.tag-chip-remove').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    removeTag(this.dataset.tag);
+                });
+            });
+            
+            // Update hidden inputs in form
+            const form = document.getElementById('filterForm');
+            form.querySelectorAll('input[name="filter_tags[]"]').forEach(input => input.remove());
+            
+            selectedTags.forEach(tag => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'filter_tags[]';
+                input.value = tag;
+                form.appendChild(input);
+            });
+        }
+        
         // Filter panel toggle
         const filterHeader = document.getElementById('filterHeader');
         const filterBody = document.getElementById('filterBody');
@@ -1036,6 +1283,9 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
         });
 
         // Tooltip handling
+        const tooltip = document.getElementById('tooltip');
+        let currentCircle = null;
+
         document.querySelectorAll('.status-circle').forEach(circle => {
             circle.addEventListener('mouseenter', function(e) {
                 showTooltip(e, this);
@@ -1049,7 +1299,6 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
                 updateTooltipPosition(e);
             });
 
-            // Click to open group page
             circle.addEventListener('click', function() {
                 const groupid = this.dataset.groupid;
                 if (groupid) {
@@ -1063,7 +1312,6 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             const data = JSON.parse(circle.dataset.tooltip);
             
             let html = '<div class="tooltip-header">' + escapeHtml(data.name) + '</div>';
-            html += '<div class="tooltip-subheader">' + escapeHtml(data.fullName) + '</div>';
             
             if (data.isHealthy) {
                 html += '<div class="tooltip-status-ok">✓ No active alerts</div>';
@@ -1083,10 +1331,6 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
                 }
                 if (data.severityCounts[2] > 0) {
                     html += '<div class="severity-item"><span class="severity-warning-text">⚠ Warning:</span> <span>' + data.severityCounts[2] + '</span></div>';
-                }
-                if (data.severityCounts[1] > 0 || data.severityCounts[0] > 0) {
-                    const infoTotal = (data.severityCounts[1] || 0) + (data.severityCounts[0] || 0);
-                    html += '<div class="severity-item"><span class="severity-info-text">ℹ Info:</span> <span>' + infoTotal + '</span></div>';
                 }
                 
                 html += '</div></div>';
@@ -1109,7 +1353,6 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             let left = event.pageX + offset;
             let top = event.pageY + offset;
             
-            // Adjust if tooltip goes off screen
             const tooltipRect = tooltip.getBoundingClientRect();
             if (left + tooltipRect.width > window.innerWidth) {
                 left = event.pageX - tooltipRect.width - offset;
@@ -1128,12 +1371,11 @@ $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !emp
             return div.innerHTML;
         }
 
-        // Refresh button - FIXED
+        // Refresh button
         document.getElementById('refreshBtn').addEventListener('click', function(e) {
             e.preventDefault();
             document.getElementById('loadingOverlay').classList.add('active');
             
-            // Get current URL parameters
             const currentUrl = new URL(window.location.href);
             currentUrl.searchParams.set('refresh', '1');
             
