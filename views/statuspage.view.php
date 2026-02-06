@@ -12,6 +12,9 @@ $filter_severities = $data['filter_severities'] ?? [];
 $filter_tags = $data['filter_tags'] ?? [];
 $filter_alert_name = $data['filter_alert_name'] ?? '';
 $filter_logic = $data['filter_logic'] ?? 'OR';
+$filter_time_range = $data['filter_time_range'] ?? '';
+$filter_time_from = $data['filter_time_from'] ?? '';
+$filter_time_to = $data['filter_time_to'] ?? '';
 $error = $data['error'] ?? null;
 
 // Spacing values
@@ -23,7 +26,7 @@ $spacing_map = [
 $gap = $spacing_map[$spacing] ?? '8px';
 
 // Check if filters are active
-$has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !empty($filter_alert_name);
+$has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !empty($filter_alert_name) || !empty($filter_time_range);
 
 // Encode data for JavaScript
 $all_tags_json = json_encode(array_column($all_tags, 'display'));
@@ -296,6 +299,88 @@ $selected_tags_json = json_encode($filter_tags);
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Time Range Filter */
+        .time-range-section {
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .time-presets {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .time-preset-btn {
+            padding: 8px 12px;
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .time-preset-btn:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .time-preset-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .custom-range-section {
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+            display: none;
+        }
+
+        .custom-range-section.active {
+            display: block;
+        }
+
+        .custom-range-label {
+            font-weight: 600;
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .custom-range-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .datetime-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .datetime-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .datetime-input {
+            padding: 8px 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 13px;
         }
 
         /* Severity Grid (2x2) */
@@ -788,6 +873,14 @@ $selected_tags_json = json_encode($filter_tags);
                 grid-template-columns: 1fr;
             }
 
+            .time-presets {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .custom-range-inputs {
+                grid-template-columns: 1fr;
+            }
+
             .header-legend {
                 font-size: 11px;
                 gap: 15px;
@@ -903,8 +996,55 @@ $selected_tags_json = json_encode($filter_tags);
                     <input type="hidden" name="icon_size" value="<?= htmlspecialchars($icon_size) ?>">
                     <input type="hidden" name="spacing" value="<?= htmlspecialchars($spacing) ?>">
                     <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                    <input type="hidden" name="filter_time_range" id="filterTimeRange" value="<?= htmlspecialchars($filter_time_range) ?>">
                     
                     <div class="filter-grid">
+                        <!-- Time Range Filter -->
+                        <div class="filter-field">
+                            <label class="filter-label">
+                                ⏰ <?= _('Time Range') ?>
+                            </label>
+                            <div class="time-range-section">
+                                <div class="time-presets">
+                                    <button type="button" class="time-preset-btn <?= $filter_time_range === '1h' ? 'active' : '' ?>" data-range="1h">1 <?= _('Hour') ?></button>
+                                    <button type="button" class="time-preset-btn <?= $filter_time_range === '3h' ? 'active' : '' ?>" data-range="3h">3 <?= _('Hours') ?></button>
+                                    <button type="button" class="time-preset-btn <?= $filter_time_range === '6h' ? 'active' : '' ?>" data-range="6h">6 <?= _('Hours') ?></button>
+                                    <button type="button" class="time-preset-btn <?= $filter_time_range === '12h' ? 'active' : '' ?>" data-range="12h">12 <?= _('Hours') ?></button>
+                                    <button type="button" class="time-preset-btn <?= $filter_time_range === '24h' ? 'active' : '' ?>" data-range="24h">24 <?= _('Hours') ?></button>
+                                    <button type="button" class="time-preset-btn <?= $filter_time_range === '3d' ? 'active' : '' ?>" data-range="3d">3 <?= _('Days') ?></button>
+                                    <button type="button" class="time-preset-btn <?= $filter_time_range === '7d' ? 'active' : '' ?>" data-range="7d">7 <?= _('Days') ?></button>
+                                    <button type="button" class="time-preset-btn <?= $filter_time_range === '15d' ? 'active' : '' ?>" data-range="15d">15 <?= _('Days') ?></button>
+                                    <button type="button" class="time-preset-btn <?= $filter_time_range === '30d' ? 'active' : '' ?>" data-range="30d">30 <?= _('Days') ?></button>
+                                </div>
+                                
+                                <button type="button" class="time-preset-btn <?= $filter_time_range === 'custom' ? 'active' : '' ?>" data-range="custom" id="customRangeBtn" style="width: 100%;">
+                                    🕐 <?= _('Custom Range') ?>
+                                </button>
+                                
+                                <div class="custom-range-section <?= $filter_time_range === 'custom' ? 'active' : '' ?>" id="customRangeSection">
+                                    <div class="custom-range-label"><?= _('Custom Time Range') ?></div>
+                                    <div class="custom-range-inputs">
+                                        <div class="datetime-group">
+                                            <label class="datetime-label"><?= _('From') ?></label>
+                                            <input type="datetime-local" 
+                                                   name="filter_time_from" 
+                                                   id="filterTimeFrom"
+                                                   class="datetime-input"
+                                                   value="<?= htmlspecialchars($filter_time_from) ?>">
+                                        </div>
+                                        <div class="datetime-group">
+                                            <label class="datetime-label"><?= _('To') ?></label>
+                                            <input type="datetime-local" 
+                                                   name="filter_time_to" 
+                                                   id="filterTimeTo"
+                                                   class="datetime-input"
+                                                   value="<?= htmlspecialchars($filter_time_to) ?>">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Alert Severity Filter (2x2 Grid) -->
                         <div class="filter-field">
                             <label class="filter-label">
@@ -1149,7 +1289,7 @@ $selected_tags_json = json_encode($filter_tags);
         function showDefaultSuggestions() {
             let html = '';
             
-            // Recent tags (last 5)
+            // Recent tags
             if (recentTags.length > 0) {
                 const recentAvailable = recentTags.filter(tag => !selectedTags.includes(tag)).slice(0, 5);
                 if (recentAvailable.length > 0) {
@@ -1162,7 +1302,7 @@ $selected_tags_json = json_encode($filter_tags);
                 }
             }
             
-            // Popular tags (top 10)
+            // Popular tags
             if (popularTags.length > 0) {
                 const popularAvailable = popularTags.filter(tag => !selectedTags.includes(tag)).slice(0, 10);
                 if (popularAvailable.length > 0) {
@@ -1259,7 +1399,7 @@ $selected_tags_json = json_encode($filter_tags);
                 });
             });
             
-            // Update hidden inputs in form
+            // Update hidden inputs
             const form = document.getElementById('filterForm');
             form.querySelectorAll('input[name="filter_tags[]"]').forEach(input => input.remove());
             
@@ -1271,6 +1411,29 @@ $selected_tags_json = json_encode($filter_tags);
                 form.appendChild(input);
             });
         }
+
+        // Time range preset buttons
+        document.querySelectorAll('.time-preset-btn[data-range]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const range = this.dataset.range;
+                
+                // Remove active from all
+                document.querySelectorAll('.time-preset-btn').forEach(b => b.classList.remove('active'));
+                
+                // Add active to clicked
+                this.classList.add('active');
+                
+                // Update hidden field
+                document.getElementById('filterTimeRange').value = range;
+                
+                // Show/hide custom range
+                if (range === 'custom') {
+                    document.getElementById('customRangeSection').classList.add('active');
+                } else {
+                    document.getElementById('customRangeSection').classList.remove('active');
+                }
+            });
+        });
         
         // Filter panel toggle
         const filterHeader = document.getElementById('filterHeader');
