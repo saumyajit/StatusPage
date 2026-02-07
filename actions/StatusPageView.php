@@ -529,9 +529,9 @@ class StatusPageView extends CController {
 
             // Sort by alert count (descending) then by name
             usort($groups_data, function($a, $b) {
-                if ($a['alert_count'] != $b['alert_count']) {
-                    return $b['alert_count'] - $a['alert_count'];
-                }
+                //if ($a['alert_count'] != $b['alert_count']) {
+                    //return $b['alert_count'] - $a['alert_count'];
+                //}
                 return strcmp($a['name'], $b['name']);
             });
 
