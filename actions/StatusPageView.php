@@ -126,10 +126,30 @@ class StatusPageView extends CController {
             
             // Fetch proxies for region detection
             $proxies = API::Proxy()->get([
-                'output' => ['proxyid', 'host'],
-                'selectProxyGroup' => ['name'],
+                'output' => ['proxyid', 'name'],
                 'preservekeys' => true
             ]);
+            
+            // Fetch proxy groups
+            $proxy_groups_api = API::ProxyGroup()->get([
+                'output' => ['proxy_groupid', 'name'],
+                'selectProxies' => ['proxyid'],
+                'preservekeys' => true
+            ]);
+            
+            // Map proxies to their groups
+            $proxy_to_groups = [];
+            foreach ($proxy_groups_api as $pg) {
+                if (!empty($pg['proxies'])) {
+                    foreach ($pg['proxies'] as $proxy) {
+                        $proxyid = $proxy['proxyid'];
+                        if (!isset($proxy_to_groups[$proxyid])) {
+                            $proxy_to_groups[$proxyid] = [];
+                        }
+                        $proxy_to_groups[$proxyid][] = $pg['name'];
+                    }
+                }
+            }
 
             // 3. Fetch ALL active triggers with tags and lastchange timestamp
             $trigger_params = [
@@ -281,23 +301,24 @@ class StatusPageView extends CController {
                     
                     // Method 2: Fallback to proxy group name, then proxy name if no region tag
                     if ($detected_region === 'Other' && !empty($host['proxy_hostid']) && isset($proxies[$host['proxy_hostid']])) {
-                        $proxy = $proxies[$host['proxy_hostid']];
+                        $proxyid = $host['proxy_hostid'];
+                        $proxy = $proxies[$proxyid];
                         
                         // First check proxy groups
-                        if (!empty($proxy['proxy_groups'])) {
-                            foreach ($proxy['proxy_groups'] as $proxy_group) {
-                                $group_name = strtoupper($proxy_group['name']);
+                        if (isset($proxy_to_groups[$proxyid]) && !empty($proxy_to_groups[$proxyid])) {
+                            foreach ($proxy_to_groups[$proxyid] as $group_name) {
+                                $group_name_upper = strtoupper($group_name);
                                 
-                                if (stripos($group_name, 'US') !== false) {
+                                if (stripos($group_name_upper, 'US') !== false) {
                                     $detected_region = 'US';
                                     break;
-                                } elseif (stripos($group_name, 'EU') !== false || stripos($group_name, 'EUROPE') !== false) {
+                                } elseif (stripos($group_name_upper, 'EU') !== false || stripos($group_name_upper, 'EUROPE') !== false) {
                                     $detected_region = 'EU';
                                     break;
-                                } elseif (stripos($group_name, 'ASIA') !== false) {
+                                } elseif (stripos($group_name_upper, 'ASIA') !== false) {
                                     $detected_region = 'Asia';
                                     break;
-                                } elseif (stripos($group_name, 'AUS') !== false || stripos($group_name, 'AUSTRALIA') !== false) {
+                                } elseif (stripos($group_name_upper, 'AUS') !== false || stripos($group_name_upper, 'AUSTRALIA') !== false) {
                                     $detected_region = 'Aus';
                                     break;
                                 }
@@ -306,7 +327,7 @@ class StatusPageView extends CController {
                         
                         // If still not found, check proxy name
                         if ($detected_region === 'Other') {
-                            $proxy_name = strtoupper($proxy['host']);
+                            $proxy_name = strtoupper($proxy['name']);
                             
                             if (stripos($proxy_name, 'US') !== false) {
                                 $detected_region = 'US';
@@ -529,9 +550,9 @@ class StatusPageView extends CController {
 
             // Sort by alert count (descending) then by name
             usort($groups_data, function($a, $b) {
-                //if ($a['alert_count'] != $b['alert_count']) {
-                    //return $b['alert_count'] - $a['alert_count'];
-                //}
+               // if ($a['alert_count'] != $b['alert_count']) {
+               //     return $b['alert_count'] - $a['alert_count'];
+               // }
                 return strcmp($a['name'], $b['name']);
             });
 
