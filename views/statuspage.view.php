@@ -1,6 +1,7 @@
 <?php
 // Get data from controller
 $statistics = $data['statistics'] ?? [];
+$regional_stats = $data['regional_stats'] ?? [];
 $groups = $data['groups'] ?? [];
 $all_tags = $data['all_tags'] ?? [];
 $popular_tags = $data['popular_tags'] ?? [];
@@ -37,6 +38,8 @@ $selected_tags_json = json_encode($filter_tags);
 <!DOCTYPE html>
 <html>
 <head>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         
@@ -602,15 +605,22 @@ $selected_tags_json = json_encode($filter_tags);
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
+        .stats-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 12px;
         }
 
         .stat-card {
             text-align: center;
-            padding: 15px;
+            padding: 12px;
             background: linear-gradient(135deg, #f5f7fa 0%, #e8eef3 100%);
             border-radius: 8px;
             border: 2px solid #e0e0e0;
@@ -622,18 +632,51 @@ $selected_tags_json = json_encode($filter_tags);
         }
 
         .stat-value {
-            font-size: 32px;
+            font-size: 24px;
             font-weight: 700;
             color: #333;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
         }
 
         .stat-label {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
             color: #666;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+        }
+
+        /* Regional Chart */
+        .regional-chart-container {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8eef3 100%);
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .regional-chart-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .chart-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        #regionalChart {
+            max-height: 200px;
+            cursor: pointer;
         }
 
         /* Status Page */
@@ -855,6 +898,10 @@ $selected_tags_json = json_encode($filter_tags);
             .control-group {
                 flex-direction: column;
                 align-items: stretch;
+            }
+
+            .stats-container {
+                grid-template-columns: 1fr;
             }
 
             .stats-grid {
@@ -1145,26 +1192,41 @@ $selected_tags_json = json_encode($filter_tags);
 
         <!-- Statistics -->
         <div class="statistics-section">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value"><?= $statistics['total_groups'] ?></div>
-                    <div class="stat-label"><?= _('TOTAL GROUPS') ?></div>
+            <div class="stats-container">
+                <!-- Stat Cards Grid (2x3) -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value"><?= $statistics['total_groups'] ?></div>
+                        <div class="stat-label"><?= _('Total Groups') ?></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value"><?= $statistics['healthy_groups'] ?></div>
+                        <div class="stat-label"><?= _('Healthy') ?></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value"><?= $statistics['groups_with_alerts'] ?></div>
+                        <div class="stat-label"><?= _('With Alerts') ?></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value"><?= $statistics['filtered_groups'] ?></div>
+                        <div class="stat-label"><?= _('Showing') ?></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value"><?= $statistics['total_alerts'] ?></div>
+                        <div class="stat-label"><?= _('Total Alerts') ?></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value"><?= $statistics['health_percentage'] ?>%</div>
+                        <div class="stat-label"><?= _('Health') ?></div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value"><?= $statistics['healthy_groups'] ?></div>
-                    <div class="stat-label"><?= _('HEALTHY') ?></div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value"><?= $statistics['groups_with_alerts'] ?></div>
-                    <div class="stat-label"><?= _('WITH ALERTS') ?></div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value"><?= $statistics['filtered_groups'] ?></div>
-                    <div class="stat-label"><?= _('SHOWING') ?></div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value"><?= $statistics['health_percentage'] ?>%</div>
-                    <div class="stat-label"><?= _('HEALTH') ?></div>
+
+                <!-- Regional Distribution Pie Chart -->
+                <div class="regional-chart-container">
+                    <div class="regional-chart-title">📍 <?= _('Regional Distribution') ?></div>
+                    <div class="chart-wrapper">
+                        <canvas id="regionalChart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1567,6 +1629,141 @@ $selected_tags_json = json_encode($filter_tags);
                 document.getElementById('refreshBtn').click();
             }
         });
+
+        // Regional Distribution Pie Chart
+        const regionalData = <?= json_encode($regional_stats) ?>;
+        const regions = ['US', 'EU', 'Asia', 'Aus', 'Other'];
+        const regionColors = {
+            'US': '#e74c3c',      // Red
+            'EU': '#3498db',      // Blue
+            'Asia': '#2ecc71',    // Green
+            'Aus': '#f39c12',     // Orange/Yellow
+            'Other': '#95a5a6'    // Gray
+        };
+
+        const chartData = {
+            labels: [],
+            datasets: [{
+                data: [],
+                backgroundColor: [],
+                borderColor: '#ffffff',
+                borderWidth: 2
+            }]
+        };
+
+        // Build chart data
+        regions.forEach(region => {
+            if (regionalData[region] && regionalData[region].total > 0) {
+                const total = regionalData[region].total;
+                const healthy = regionalData[region].healthy;
+                const alerts = regionalData[region].alerts;
+                
+                chartData.labels.push(region);
+                chartData.datasets[0].data.push(total);
+                chartData.datasets[0].backgroundColor.push(regionColors[region]);
+            }
+        });
+
+        // Create pie chart
+        const ctx = document.getElementById('regionalChart');
+        const regionalChart = new Chart(ctx, {
+            type: 'pie',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: {
+                                size: 11,
+                                weight: 'bold'
+                            },
+                            padding: 8,
+                            generateLabels: function(chart) {
+                                const data = chart.data;
+                                return data.labels.map((label, i) => {
+                                    const value = data.datasets[0].data[i];
+                                    const region = label;
+                                    const healthy = regionalData[region].healthy;
+                                    const withAlerts = regionalData[region].alerts;
+                                    
+                                    return {
+                                        text: `${label}: ${value} (${healthy}✓ ${withAlerts}⚠)`,
+                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        hidden: false,
+                                        index: i
+                                    };
+                                });
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                const region = context.label;
+                                const total = context.parsed;
+                                const healthy = regionalData[region].healthy;
+                                const alerts = regionalData[region].alerts;
+                                const percentage = ((total / <?= $statistics['total_groups'] ?>) * 100).toFixed(1);
+                                
+                                return [
+                                    `${region}: ${total} groups (${percentage}%)`,
+                                    `Healthy: ${healthy}`,
+                                    `With Alerts: ${alerts}`
+                                ];
+                            }
+                        }
+                    }
+                },
+                onClick: function(event, elements) {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const region = chartData.labels[index];
+                        
+                        // Filter circles by region
+                        filterByRegion(region);
+                    }
+                }
+            }
+        });
+
+        // Filter by region function
+        let currentRegionFilter = null;
+        
+        function filterByRegion(region) {
+            const circles = document.querySelectorAll('.status-circle');
+            const groups = <?= json_encode($groups) ?>;
+            
+            if (currentRegionFilter === region) {
+                // Toggle off - show all
+                currentRegionFilter = null;
+                circles.forEach(circle => {
+                    circle.style.display = '';
+                });
+            } else {
+                // Filter to selected region
+                currentRegionFilter = region;
+                
+                circles.forEach((circle, index) => {
+                    if (groups[index] && groups[index].region === region) {
+                        circle.style.display = '';
+                    } else {
+                        circle.style.display = 'none';
+                    }
+                });
+            }
+        }
     })();
     </script>
 </body>
