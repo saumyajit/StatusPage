@@ -1114,6 +1114,72 @@ $selected_tags_json = json_encode($filter_tags);
 		.region-asia { border-left-color: #2ecc71; }
 		.region-aus { border-left-color: #f39c12; }
 		.region-other { border-left-color: #95a5a6; }
+		
+		/* Active filter banner */
+		.region-filter-active {
+			background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+			color: white;
+			padding: 10px 12px;
+			border-radius: 6px;
+			margin-bottom: 12px;
+			display: none;
+			align-items: center;
+			justify-content: space-between;
+			animation: slideDown 0.3s ease;
+		}
+		
+		.region-filter-active.visible {
+			display: flex;
+		}
+		
+		@keyframes slideDown {
+			from {
+				opacity: 0;
+				transform: translateY(-10px);
+			}
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+		
+		.filter-active-text {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			font-size: 13px;
+			font-weight: 600;
+		}
+		
+		.filter-active-region {
+			font-weight: 700;
+			font-size: 14px;
+		}
+		
+		.filter-clear-btn {
+			background: rgba(255, 255, 255, 0.2);
+			border: 1px solid rgba(255, 255, 255, 0.4);
+			color: white;
+			padding: 5px 12px;
+			border-radius: 4px;
+			font-size: 12px;
+			font-weight: 600;
+			cursor: pointer;
+			transition: all 0.2s;
+		}
+		
+		.filter-clear-btn:hover {
+			background: rgba(255, 255, 255, 0.3);
+			transform: scale(1.05);
+		}
+		
+		/* Update hint to show clear instruction */
+		.region-filter-hint.with-filter {
+			background: #fff3cd;
+			color: #856404;
+			border: 1px solid #ffc107;
+			font-weight: 600;
+		}
     </style>
 </head>
 <body>
@@ -1469,6 +1535,17 @@ $selected_tags_json = json_encode($filter_tags);
 				<div class="regional-chart-sidebar">
 					<div class="regional-chart-title">📍 Regional Distribution</div>
 				
+					<!-- Active Filter Banner (Hidden by default) -->
+					<div class="region-filter-active" id="regionFilterActive">
+						<div class="filter-active-text">
+							<span>🔍 Filtering:</span>
+							<span class="filter-active-region" id="filterActiveRegion"></span>
+						</div>
+						<button class="filter-clear-btn" id="clearFilterBtn">
+							✕ Clear
+						</button>
+					</div>
+				
 					<div class="regional-chart-content">
 						<!-- Donut Chart -->
 						<div class="chart-canvas-wrapper">
@@ -1483,7 +1560,7 @@ $selected_tags_json = json_encode($filter_tags);
 						<div class="regional-stats-list" id="regionalStatsList"></div>
 					</div>
 				
-					<div class="region-filter-hint">
+					<div class="region-filter-hint" id="regionFilterHint">
 						💡 Click to filter by region
 					</div>
 				</div>
@@ -1882,7 +1959,7 @@ $selected_tags_json = json_encode($filter_tags);
 						cutout: '68%',
 						plugins: {
 							legend: {
-								display: false  // We'll use custom list below
+								display: false
 							},
 							tooltip: {
 								backgroundColor: 'rgba(0, 0, 0, 0.9)',
@@ -1919,6 +1996,10 @@ $selected_tags_json = json_encode($filter_tags);
 								filterByRegion(region);
 							}
 						},
+						// ADDITION: Double-click to clear filter
+						onDoubleClick: function() {
+							clearRegionFilter();
+						},
 						animation: {
 							animateRotate: true,
 							animateScale: true,
@@ -1933,6 +2014,12 @@ $selected_tags_json = json_encode($filter_tags);
 			
 				// Build regional stats list
 				buildRegionalStatsList();
+			
+				// ADDITION: Clear filter button event
+				document.getElementById('clearFilterBtn').addEventListener('click', function(e) {
+					e.stopPropagation();
+					clearRegionFilter();
+				});
 			}
 			
 			function buildRegionalStatsList() {
@@ -1973,37 +2060,79 @@ $selected_tags_json = json_encode($filter_tags);
 				});
 			}
 			
-			// Filter by region with visual feedback
+			// ENHANCED: Filter by region with clear functionality
 			let currentRegionFilter = null;
+			
 			function filterByRegion(region) {
+				if (currentRegionFilter === region) {
+					// Click same region - clear filter
+					clearRegionFilter();
+				} else {
+					// Apply new filter
+					currentRegionFilter = region;
+					applyRegionFilter(region);
+					updateFilterUI(region);
+				}
+			}
+			
+			function applyRegionFilter(region) {
 				const circles = document.querySelectorAll('.status-circle');
 				const statItems = document.querySelectorAll('.regional-stat-item');
 			
-				if (currentRegionFilter === region) {
-					// Toggle off - show all
-					currentRegionFilter = null;
-					circles.forEach(circle => circle.style.display = '');
-					statItems.forEach(item => item.classList.remove('filtered'));
-				} else {
-					// Filter to selected region
-					currentRegionFilter = region;
+				circles.forEach(circle => {
+					if (circle.dataset.region === region) {
+						circle.style.display = '';
+					} else {
+						circle.style.display = 'none';
+					}
+				});
 			
-					circles.forEach(circle => {
-						if (circle.dataset.region === region) {
-							circle.style.display = '';
-						} else {
-							circle.style.display = 'none';
-						}
-					});
+				statItems.forEach(item => {
+					if (item.dataset.region === region) {
+						item.classList.add('filtered');
+					} else {
+						item.classList.remove('filtered');
+					}
+				});
+			}
 			
-					statItems.forEach(item => {
-						if (item.dataset.region === region) {
-							item.classList.add('filtered');
-						} else {
-							item.classList.remove('filtered');
-						}
-					});
-				}
+			function clearRegionFilter() {
+				currentRegionFilter = null;
+			
+				// Show all circles
+				const circles = document.querySelectorAll('.status-circle');
+				circles.forEach(circle => {
+					circle.style.display = '';
+				});
+			
+				// Remove filtered class from all stat items
+				const statItems = document.querySelectorAll('.regional-stat-item');
+				statItems.forEach(item => {
+					item.classList.remove('filtered');
+				});
+			
+				// Hide filter banner
+				const filterActive = document.getElementById('regionFilterActive');
+				filterActive.classList.remove('visible');
+			
+				// Reset hint text
+				const filterHint = document.getElementById('regionFilterHint');
+				filterHint.textContent = '💡 Click to filter by region';
+				filterHint.classList.remove('with-filter');
+			}
+			
+			function updateFilterUI(region) {
+				// Show filter banner
+				const filterActive = document.getElementById('regionFilterActive');
+				const filterActiveRegion = document.getElementById('filterActiveRegion');
+			
+				filterActiveRegion.textContent = regionLabels[region];
+				filterActive.classList.add('visible');
+			
+				// Update hint text
+				const filterHint = document.getElementById('regionFilterHint');
+				filterHint.innerHTML = '💡 Click same region or <strong>Clear</strong> button to show all';
+				filterHint.classList.add('with-filter');
 			}
 
         })();
