@@ -114,12 +114,20 @@ class StatusPageView extends CController {
                 }
             }
 
-            // 2. Fetch hosts for these groups
+            // 2. Fetch hosts for these groups with tags and proxy info
             $hosts = API::Host()->get([
-                'output' => ['hostid', 'host', 'name', 'status'],
+                'output' => ['hostid', 'host', 'name', 'status', 'proxy_hostid'],
                 'groupids' => array_keys($customer_groups),
                 'selectHostGroups' => ['groupid'],
+                'selectTags' => ['tag', 'value'],
                 'monitored_hosts' => true,
+                'preservekeys' => true
+            ]);
+            
+            // Fetch proxies for region detection
+            $proxies = API::Proxy()->get([
+                'output' => ['proxyid', 'host'],
+                'selectProxyGroup' => ['name'],
                 'preservekeys' => true
             ]);
 
@@ -190,7 +198,7 @@ class StatusPageView extends CController {
                 }
             }
 
-            // 4. Build group data and apply PROPER OR/AND logic at GROUP level
+            // Build group data and apply PROPER OR/AND logic at GROUP level
             $groups_data = [];
             $statistics = [
                 'total_groups' => count($customer_groups),
@@ -203,6 +211,15 @@ class StatusPageView extends CController {
                 'warning_alerts' => 0,
                 'info_alerts' => 0,
                 'filtered_groups' => 0
+            ];
+            
+            // Regional statistics
+            $regional_stats = [
+                'US' => ['healthy' => 0, 'alerts' => 0, 'total' => 0],
+                'EU' => ['healthy' => 0, 'alerts' => 0, 'total' => 0],
+                'Asia' => ['healthy' => 0, 'alerts' => 0, 'total' => 0],
+                'Aus' => ['healthy' => 0, 'alerts' => 0, 'total' => 0],
+                'Other' => ['healthy' => 0, 'alerts' => 0, 'total' => 0]
             ];
 
             $has_active_filters = !empty($filter_severities) || !empty($filter_tags) || !empty($filter_alert_name) || !empty($filter_time_range);
@@ -220,6 +237,101 @@ class StatusPageView extends CController {
                 ];
                 $alert_details = [];
                 $group_tags = [];
+                
+                // Detect region for this group
+                $group_region = 'Other';
+                $region_votes = [];
+                
+                // Check all hosts in this group for region
+                foreach ($hosts as $host) {
+                    if (!isset($host['hostgroups'])) continue;
+                    
+                    $in_this_group = false;
+                    foreach ($host['hostgroups'] as $hg) {
+                        if ($hg['groupid'] == $groupid) {
+                            $in_this_group = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!$in_this_group) continue;
+                    
+                    $detected_region = 'Other';
+                    
+                    // Method 1: Check host tags for "Region"
+                    if (!empty($host['tags'])) {
+                        foreach ($host['tags'] as $tag) {
+                            if (strtolower($tag['tag']) === 'region') {
+                                $region_value = strtoupper(trim($tag['value']));
+                                if (in_array($region_value, ['US', 'EU', 'ASIA', 'AUS'])) {
+                                    $detected_region = $region_value === 'AUS' ? 'Aus' : $region_value;
+                                } elseif (stripos($region_value, 'US') !== false) {
+                                    $detected_region = 'US';
+                                } elseif (stripos($region_value, 'EU') !== false || stripos($region_value, 'EUROPE') !== false) {
+                                    $detected_region = 'EU';
+                                } elseif (stripos($region_value, 'ASIA') !== false) {
+                                    $detected_region = 'Asia';
+                                } elseif (stripos($region_value, 'AUS') !== false || stripos($region_value, 'AUSTRALIA') !== false) {
+                                    $detected_region = 'Aus';
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Method 2: Fallback to proxy group name, then proxy name if no region tag
+                    if ($detected_region === 'Other' && !empty($host['proxy_hostid']) && isset($proxies[$host['proxy_hostid']])) {
+                        $proxy = $proxies[$host['proxy_hostid']];
+                        
+                        // First check proxy groups
+                        if (!empty($proxy['proxy_groups'])) {
+                            foreach ($proxy['proxy_groups'] as $proxy_group) {
+                                $group_name = strtoupper($proxy_group['name']);
+                                
+                                if (stripos($group_name, 'US') !== false) {
+                                    $detected_region = 'US';
+                                    break;
+                                } elseif (stripos($group_name, 'EU') !== false || stripos($group_name, 'EUROPE') !== false) {
+                                    $detected_region = 'EU';
+                                    break;
+                                } elseif (stripos($group_name, 'ASIA') !== false) {
+                                    $detected_region = 'Asia';
+                                    break;
+                                } elseif (stripos($group_name, 'AUS') !== false || stripos($group_name, 'AUSTRALIA') !== false) {
+                                    $detected_region = 'Aus';
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // If still not found, check proxy name
+                        if ($detected_region === 'Other') {
+                            $proxy_name = strtoupper($proxy['host']);
+                            
+                            if (stripos($proxy_name, 'US') !== false) {
+                                $detected_region = 'US';
+                            } elseif (stripos($proxy_name, 'EU') !== false || stripos($proxy_name, 'EUROPE') !== false) {
+                                $detected_region = 'EU';
+                            } elseif (stripos($proxy_name, 'ASIA') !== false) {
+                                $detected_region = 'Asia';
+                            } elseif (stripos($proxy_name, 'AUS') !== false || stripos($proxy_name, 'AUSTRALIA') !== false) {
+                                $detected_region = 'Aus';
+                            }
+                        }
+                    }
+                    
+                    // Vote for region
+                    if (!isset($region_votes[$detected_region])) {
+                        $region_votes[$detected_region] = 0;
+                    }
+                    $region_votes[$detected_region]++;
+                }
+                
+                // Majority vote wins
+                if (!empty($region_votes)) {
+                    arsort($region_votes);
+                    $group_region = array_key_first($region_votes);
+                }
                 
                 // Flags for OR/AND logic
                 $matches_severity = false;
@@ -321,6 +433,16 @@ class StatusPageView extends CController {
                     $statistics['groups_with_alerts']++;
                     $statistics['total_alerts'] += $alert_count;
                 }
+                
+                // Update regional statistics
+                if (isset($regional_stats[$group_region])) {
+                    $regional_stats[$group_region]['total']++;
+                    if ($is_healthy) {
+                        $regional_stats[$group_region]['healthy']++;
+                    } else {
+                        $regional_stats[$group_region]['alerts']++;
+                    }
+                }
 
                 // Apply filter logic at GROUP level
                 $include_group = true;
@@ -382,7 +504,8 @@ class StatusPageView extends CController {
                         'highest_severity' => $highest_severity,
                         'severity_counts' => $severity_counts,
                         'alert_details' => $alert_details,
-                        'tags' => array_keys($group_tags)
+                        'tags' => array_keys($group_tags),
+                        'region' => $group_region
                     ];
                 }
             }
@@ -420,6 +543,7 @@ class StatusPageView extends CController {
             // Prepare response data
             $data = [
                 'statistics' => $statistics,
+                'regional_stats' => $regional_stats,
                 'groups' => $groups_data,
                 'all_tags' => array_values($all_tags),
                 'popular_tags' => $popular_tags,
@@ -457,6 +581,13 @@ class StatusPageView extends CController {
                     'info_alerts' => 0,
                     'health_percentage' => 0,
                     'filtered_groups' => 0
+                ],
+                'regional_stats' => [
+                    'US' => ['healthy' => 0, 'alerts' => 0, 'total' => 0],
+                    'EU' => ['healthy' => 0, 'alerts' => 0, 'total' => 0],
+                    'Asia' => ['healthy' => 0, 'alerts' => 0, 'total' => 0],
+                    'Aus' => ['healthy' => 0, 'alerts' => 0, 'total' => 0],
+                    'Other' => ['healthy' => 0, 'alerts' => 0, 'total' => 0]
                 ],
                 'groups' => [],
                 'all_tags' => [],
